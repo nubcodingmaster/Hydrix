@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*
+!.env.example
+.DS_Store
+data/raw/
+*.tsbuildinfo
+test-results/
+playwright-report/
+apps/web/.cache/
