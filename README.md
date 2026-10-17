@@ -19,7 +19,8 @@ Tujuan proyek adalah membantu perencanaan berbasis bukti. Rekomendasi saat ini m
 | Konteks air | WaPOR v3: ET aktual dan ET referensi, dengan periode serta resolusi masing-masing |
 | Konteks tutupan lahan | WorldCereal 2021, klasifikasi tanaman semusim dan confidence kelas |
 | Gemini | Integrasi penjelasan tersedia; panggilan API langsung belum diuji karena API key belum dikonfigurasi |
-| NDVI dan kelembapan tanah | Belum terintegrasi |
+| Tanah, cuaca, dan NDVI via Earth Engine | Ekstraksi langsung diuji; pH, karbon organik, tekstur, ERA5-Land, dan NDVI tersambung |
+| Kelembapan tanah | Belum terintegrasi |
 | Backend dan deployment | Belum tersedia; aplikasi membaca snapshot publik dari berkas JSON |
 
 Data nyata disimpan sebagai snapshot agar UI dapat dijalankan tanpa kredensial. Browser tidak mengambil raster atau memanggil Gemini secara langsung. Snapshot tidak berarti data diperbarui otomatis; pembaruan memerlukan pipeline sinkronisasi.
@@ -59,6 +60,8 @@ apps/web/
   README.md             Detail metode, pembaruan data, dan batas penggunaan
 docs/superpowers/       Desain awal, rencana implementasi, dan catatan perkembangan
 ```
+
+UI menggunakan bahasa Inggris. Dukungan pupuk/OPT memakai bukti API saja, tanpa formulir data lapangan.
 
 Stack: React 19, TypeScript, Vite, Tailwind CSS, MapLibre GL, beUI, Vitest, dan Playwright. Implementasi saat ini menjadi acuan status fitur; dokumen desain awal dapat memuat rencana yang belum dibangun.
 
@@ -110,3 +113,11 @@ Daftar berikut merupakan usulan urutan kerja untuk melanjutkan proyek. Item yang
 - Implementasi belum memiliki login, penyimpanan pengguna, penetapan bantuan, atau deployment produksi.
 
 Lihat [dokumentasi teknis frontend](apps/web/README.md) untuk periode snapshot, resolusi raster, evaluasi model, dan batas interpretasi lebih lengkap.
+
+## Pembaruan 16 Oktober 2026 — Earth Engine dan UI Inggris
+
+Integrasi batch baru mencakup OpenLandMap pH, karbon organik, tekstur tanah, ERA5-Land Hourly (suhu dan kelembapan relatif), serta Sentinel-2 SR Harmonized (NDVI dengan penyaringan awan). Proyek Google Cloud `rising-guide-511814-p1` telah didaftarkan pada Earth Engine Community. Service account `hydrix-data-reader` telah dikonfigurasi oleh pengguna; autentikasi dan ekstraksi langsung berhasil diuji. Billing tidak diaktifkan selama penyiapan ini.
+
+Jalankan `npm run data:earth-engine` dari `apps/web` setelah kredensial dikonfigurasi. Snapshot publik `agronomy.json` menampilkan sumber yang belum tersambung sebagai unavailable. Tidak ada nilai tanah, cuaca, atau vegetasi buatan. Detail autentikasi, kualitas, dan keterbatasan tersedia pada README frontend.
+
+Panel pemerintah, halaman petani, sumber data, kalender, pesan gagal, dan usulan bantuan sekarang berbahasa Inggris. Nilai atribut mentah dan nama geografis tetap dipertahankan dalam ekspor. Usulan bantuan berasal dari aturan penapisan dengan sumber yang dapat diperiksa, bukan keluaran Gemini. Tidak ada diagnosis kekurangan nutrisi, identifikasi OPT, dosis pupuk, atau penetapan insektisida dari citra saja.

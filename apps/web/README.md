@@ -56,3 +56,60 @@ Gemini hanya menjelaskan hasil model yang sudah dihitung. Gemini tidak menentuka
 Kelembapan tanah, NDVI, anggaran, dan penerima bantuan belum tersedia. Tidak ada deployment cloud atau integrasi GEE berautentikasi. Peta memakai OpenStreetMap dengan attribution. GPS opt-in tidak disimpan dan dicocokkan terhadap poligon, bukan titik terdekat. Ekspor menyertakan sumber, tanggal survei, lingkungan, metode proyeksi, hasil evaluasi, serta batas pemakaian.
 
 Sumber beUI berada di `components/` dan `lib/`. Heat calendar mendapat opsi palet dan pengecualian tanggal tanpa data. Alias `@/` menunjuk root frontend. Tes browser memakai Chrome terpasang di macOS; sesuaikan `playwright.config.ts` pada mesin lain. Build masih memiliki peringatan ukuran bundle yang besar.
+
+## Earth Engine API integration (16 October 2026)
+
+The interface is now in English. Farmer links use `/?view=farmer`; legacy `/?view=petani` links still work. No manual field-data inputs have been added.
+
+### Authentication and extraction
+
+Cloud project: `rising-guide-511814-p1` (HYDRIX), registered for the noncommercial Earth Engine Community tier without enabling billing. The `hydrix-data-reader` service account has been configured by the user. Live extraction authenticated successfully on 16 October 2026.
+
+Grant that service account only `roles/earthengine.viewer` and `roles/serviceusage.serviceUsageConsumer` on this project. Store its JSON key outside the repository or in the Git-ignored root `.secrets/` directory with owner-only permissions. Never put a key in `public/`, a `VITE_` variable, or chat. Copy `.env.example` to `.env.local`, set `GOOGLE_APPLICATION_CREDENTIALS` to the absolute key path, and run:
+
+```sh
+npm run data:earth-engine
+```
+
+An already-issued short-lived OAuth token can alternatively be supplied using `EARTH_ENGINE_ACCESS_TOKEN`. Extraction uses the official Earth Engine SDK and maintained Google Auth library with the Earth Engine read-only scope. The SDK's transitive `googleapis` dependency is overridden to a current version to remove vulnerabilities in legacy authentication dependencies. The legacy SDK private-key authentication helper is not used because it uses an obsolete JWT constructor.
+
+The command exits unsuccessfully when credentials, source access, or extraction fail. It writes availability metadata without inventing observations. Previous successful layers are retained only when they match the base snapshot version, and are labeled Cached after a failed refresh. Public snapshots contain no credentials or raw provider errors. The full `data:sync` command stops on Earth Engine failure so missing integrations are not silently reported as successful.
+
+### Sources and methods
+
+- `OpenLandMap/SOL/SOL_PH-H2O_USDA-4C1A2A_M/v02`: modeled soil pH, 250 m; stored raw values divided by 10.
+- `OpenLandMap/SOL/SOL_ORGANIC-CARBON_USDA-6A1C_M/v02`: modeled organic carbon, 250 m; stored values multiplied by 5 g/kg.
+- `OpenLandMap/SOL/SOL_TEXTURE-CLASS_USDA-TT_M/v02`: modeled USDA texture class, 250 m; polygon mode rather than averaging categorical codes.
+- Soil layers retain separate 0, 10 and 30 cm depths, source dates (1950–2018), units, and native scale. These are modeled historical soil maps, not annual observations or a measured 0–30 cm layer.
+- `ECMWF/ERA5_LAND/HOURLY`: 30 UTC days before the latest available observation date. Requires at least 648 of 720 distinct hourly timestamps (90% temporal coverage); records actual coverage and missing timestamps without interpolation. Temperature is converted from Kelvin to Celsius. Relative humidity is computed for each hour from temperature and dewpoint using the Magnus formula, then averaged over available hours. Weather samples use the regional pixel at each field bounding-box center because survey polygons are too small for reliable area reduction on this grid. Native scale: approximately 11,132 m. This is recent reanalysis, not a forecast or a calibrated pest model.
+- `COPERNICUS/S2_SR_HARMONIZED`: median NDVI from B8/B4 over the latest 30-day window and preceding 30-day window. SCL classes 4, 5 and 6 are retained; clouds, shadows, snow and unclassified pixels are excluded. A pixel needs three valid observations; a polygon needs at least 50% valid coverage. Insufficient coverage yields null NDVI. Dates, valid coverage and observation counts are retained. NDVI change can also reflect harvest, crop stage or water stress and does not establish pest occurrence.
+
+The frontend rejects malformed agronomy values and snapshots from a different base version. The map popover, rainfall page, farmer page and JSON exports show the added evidence. Regional planning includes proposals for every location.
+
+### Support proposal limits
+
+API-only rules explain available soil and climate evidence and identify whether a support proposal can be reviewed. Soil coverage supports fertility assessment and nutrient planning proposals, not a specific fertilizer type or dose. Climate and vegetation coverage support surveillance and extension proposals, not an insecticide allocation or diagnosis. Crop profiles remain conditional; this integration does not establish full agronomic suitability. No field input form is required. Gemini summaries remain a separate optional integration and are requested in English.
+
+Live Earth Engine extraction has been tested. The first weather attempt was rejected because the source provided 692 of 720 hourly images; extraction now preserves missing timestamps and publishes temporal coverage. Unit and browser tests exercise missing data, invalid values, snapshot compatibility, localization, support panels and exports; controlled data in tests are not published as observations.
+
+## UI review updates (16 October 2026)
+
+The planning panels omit the source/date lines below agronomy values, the methodology accordion, repeated seasonal notices, the map popover survey eyebrow, the planning slogan, calendar captions, the filter survey label, the historical Evidence column, and the regional raster footnote. Source metadata and projection parameters remain in source snapshots and exports. Support proposals are labeled Data-based guidance; Gemini remains deferred at the user's request.
+
+The history tab now reads all 420 observed monthly records from each CHIRPS pixel in the projection snapshot and merges the latest observed rainfall, with the latest observation taking precedence if a month occurs twice. A year selector covers 1991–2026. The absent January–August 2025 observations remain null in the selected year's calendar and table. No future projections are mixed into historical observations.
+
+The map currently uses MapLibre with OpenStreetMap. Google Maps satellite/hybrid imagery is possible through the official Maps JavaScript API, but requires a separate restricted Maps browser API key and billing. The Earth Engine service account does not enable Google Maps rendering. No Google Maps service, key, or billing has been enabled.
+
+## Government Planning menu
+
+The sidebar now includes Planning and omits the previous uppercase PLANNING section label. Both the sidebar entry and the map popover's Plan all locations button open the same planning board.
+
+The board includes Urgent (actions due this or next month), Mid-term (two to three months), Long-term (four or more months), and Needs data. Priority represents proposed action timing, not calibrated agronomic risk or an outbreak probability. District and support-type filters apply to cards, counts and the exported JSON. View on map opens the corresponding real survey location. Farmer-group identities are not available and are not invented.
+
+`planning-v1` creates three proposals per survey location:
+
+- Water support uses the lowest projected monthly rainfall still within the remaining outlook. The suggested planning lead is three months before that month, clamped to the current month if the lead date has passed. A drier projected month is not a confirmed drought. Proposed support includes irrigation readiness, repair planning and water storage; boreholes require feasibility assessment.
+- Crop protection proposes current-month surveillance preparation when weather or vegetation observations no older than 60 days are available. It does not predict a pest species, outbreak month, or insecticide requirement.
+- Nutrient support proposes a planning slot two months from the reference month when all three soil indicators at 10 cm are present. This is an explicit scheduling assumption, not a known planting date or a fertilizer prescription. Missing soil indicators yield an unscheduled Needs data proposal.
+
+The reference date uses Asia/Makassar. Missing or expired rainfall projections remain unscheduled. Source values, dates, model limits and lead-time assumptions are available through Why this proposal and the export. AI integration remains deferred as requested; the board labels results as data-based drafts. No budgets, aid recipients, or pesticide quantities are assigned.

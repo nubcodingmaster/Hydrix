@@ -25,7 +25,7 @@ export default function PilotMap({ plots, selected, onSelect, onDismiss }: { plo
       plots.forEach(p => {
         const marker = document.createElement('button');
         marker.className = 'map-marker real-field-marker';
-        marker.setAttribute('aria-label', `Pilih ${p.name}`);
+        marker.setAttribute('aria-label', `Select ${p.name}`);
         marker.title = `${p.name} · ${p.district}`;
         marker.onclick = event => { event.stopPropagation(); callback.current(p.id); };
         new maplibregl.Marker({ element: marker }).setLngLat(p.center).addTo(instance);
@@ -55,10 +55,10 @@ export default function PilotMap({ plots, selected, onSelect, onDismiss }: { plo
     if (map.current?.getLayer('base')) map.current.setLayoutProperty('base', 'visibility', next ? 'visible' : 'none');
     setBasemap(next);
   }
-  return <div className="map-wrap"><div ref={container} className="map-canvas" aria-label="Peta poligon survei Kementan di Majalengka"/>
-    <div className="map-top"><span className="map-pill">{plots.length} poligon · survei Kementan</span><Button size="sm" variant="secondary" onClick={toggleBase}><Layers size={14}/>{basemap ? 'Peta dasar' : 'Tanpa peta dasar'}</Button></div>
-    <div className="map-zoom"><Button size="icon" variant="secondary" aria-label="Perbesar peta" onClick={() => map.current?.zoomIn()}><Plus size={16}/></Button><Button size="icon" variant="secondary" aria-label="Perkecil peta" onClick={() => map.current?.zoomOut()}><Minus size={16}/></Button></div>
-    {failed && <span className="map-fallback">Peta dasar tidak tersedia. Titik dan poligon survei tetap dapat dipilih.</span>}
-    <div className="map-legend"><i/> Batas asli survei · kondisi terkini perlu verifikasi</div>
+  return <div className="map-wrap"><div ref={container} className="map-canvas" aria-label="Kementan survey polygons in Majalengka"/>
+    <div className="map-top"><span className="map-pill">{plots.length} polygons · Kementan survey</span><Button size="sm" variant="secondary" onClick={toggleBase}><Layers size={14}/>{basemap ? 'Basemap' : 'No basemap'}</Button></div>
+    <div className="map-zoom"><Button size="icon" variant="secondary" aria-label="Zoom in" onClick={() => map.current?.zoomIn()}><Plus size={16}/></Button><Button size="icon" variant="secondary" aria-label="Zoom out" onClick={() => map.current?.zoomOut()}><Minus size={16}/></Button></div>
+    {failed && <span className="map-fallback">Basemap unavailable. Survey markers and polygons remain selectable.</span>}
+    <div className="map-legend"><i/> Original survey boundaries · current conditions unconfirmed</div>
   </div>;
 }

@@ -8,12 +8,13 @@
     "build": "tsc -b && vite build",
     "test": "vitest run src",
     "test:e2e": "playwright test",
-    "data:sync": "npm run data:base && npm run data:environment && npm run data:history && npm run data:project && npm run data:ai",
+    "data:sync": "npm run data:base && npm run data:environment && npm run data:history && npm run data:project && npm run data:earth-engine && npm run data:ai",
     "data:base": "node scripts/sync-data.mjs",
     "data:environment": "node scripts/enrich-environment.mjs",
     "data:history": "node scripts/fetch-climate-history-noaa.mjs",
     "data:project": "node scripts/build-projections.mjs",
-    "data:ai": "node scripts/generate-ai-summaries.mjs"
+    "data:ai": "node scripts/generate-ai-summaries.mjs",
+    "data:earth-engine": "node scripts/sync-earth-engine.mjs"
   },
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",
@@ -27,6 +28,7 @@
     "tailwind-merge": "^3.0.0"
   },
   "devDependencies": {
+    "@google/earthengine": "^1.7.48",
     "@playwright/test": "^1.64.0",
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^22.0.0",
@@ -34,9 +36,15 @@
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
     "geotiff": "^3.0.5",
+    "google-auth-library": "^11.3.1",
     "tailwindcss": "^4.0.0",
     "typescript": "~5.8.3",
     "vite": "^6.0.0",
     "vitest": "^5.0.4"
+  },
+  "overrides": {
+    "@google/earthengine": {
+      "googleapis": "^186.0.0"
+    }
   }
 }

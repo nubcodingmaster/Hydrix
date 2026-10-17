@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { candidates, containsPoint, fieldReport, regionalGroups, type Snapshot } from './live';
+import { candidates, containsPoint, fieldReport, rainfallHistory, regionalGroups, type Snapshot } from './live';
 const data = JSON.parse(readFileSync(new URL('../../public/data/majalengka.json', import.meta.url), 'utf8')) as Snapshot;
 
 describe('public source snapshot', () => {
@@ -35,7 +35,7 @@ describe('public source snapshot', () => {
     expect(report.seasonal_projection).toBeNull();
     expect(report.soil_moisture).toBeNull();
     expect(report.ndvi).toBeNull();
-    expect(candidates(data).find(c => c.name === 'Bawang putih')?.count).toBe(0);
+    expect(candidates(data).find(c => c.name === 'Garlic')?.count).toBe(0);
     expect(data.quality.rejected.length).toBeGreaterThan(0);
     expect(regionalGroups(data).flatMap(g => g.plots).length).toBe(data.plots.length);
   });
@@ -51,6 +51,20 @@ describe('environmental enrichment and projections',()=>{
   const environment=JSON.parse(readFileSync(new URL('../../public/data/environment.json',import.meta.url),'utf8'));
   const projections=JSON.parse(readFileSync(new URL('../../public/data/projections.json',import.meta.url),'utf8'));
   const enriched={...data,environment,projections} as Snapshot;
+  it('exposes the long history without filling missing 2025 months or including forecasts', () => {
+    for (const plot of data.plots) {
+      const history = rainfallHistory(plot, enriched);
+      expect(history).toHaveLength(420);
+      expect(history[0].id).toBe('1991-01');
+      expect(history.at(-1)?.id).toBe('2026-08');
+      expect(history.filter(month => month.id.startsWith('2005-'))).toHaveLength(12);
+      expect(history.filter(month => month.id.startsWith('2025-'))).toHaveLength(4);
+      expect(history.some(month => month.id === '2025-01')).toBe(false);
+      expect(history.every(month => month.id < projections.issuedAt.slice(0, 7))).toBe(true);
+      expect(history.at(-1)?.rain).toBe(plot.rainfall.at(-1)?.rain);
+    }
+    expect(rainfallHistory(data.plots[0], data)).toHaveLength(12);
+  });
   it('keeps WaPOR scale, observation dates, and real WorldCereal classes',()=>{
     expect(environment.errors).toEqual([]);
     expect(environment.baseFetchedAt).toBe(data.fetchedAt);
