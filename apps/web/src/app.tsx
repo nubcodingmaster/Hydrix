@@ -11,6 +11,8 @@ import RainCalendar from './rain-calendar';
 import EnvironmentContext from './environment-context';
 import ProjectionPanel from './projection-panel';
 import { candidates, projectionFor, projectionSummary, containsPoint, dateLabel, fieldReport, irrigationLabel, loadSnapshot, monthLabel, plotAction, rainfallText, regionalGroups, type Candidate, type RainMonth, type Snapshot } from './data/live';
+import { governmentRecommendations } from './ai/government-engine';
+import { farmerRecommendations } from './ai/farmer-engine';
 
 type Page = 'overview' | 'calendar' | 'crops' | 'sources' | 'report';
 const pages = [{ id: 'overview', label: 'Peta', icon: Map }, { id: 'calendar', label: 'Kalender hujan', icon: CalendarDays }, { id: 'crops', label: 'Kandidat tanam', icon: Sprout }, { id: 'sources', label: 'Sumber & kualitas data', icon: Database }] as const;
@@ -52,6 +54,8 @@ function Application({ snapshot }: { snapshot: Snapshot }) {
   const environment = snapshot.environment?.byPlot[plot.id];
   const profiles = candidates(snapshot);
   const groups = regionalGroups(snapshot);
+  const governmentAI = governmentRecommendations(plot, snapshot);
+  const farmerAI = farmerRecommendations(plot, snapshot);
   const period = `${monthLabel(snapshot.period.start)} – ${monthLabel(snapshot.period.end)}`;
   const surveyYears = [...new Set(snapshot.plots.flatMap(p => p.surveyDate ? [p.surveyDate.slice(0, 4)] : []))].sort().join(', ');
   function selectPlot(id: string) {
@@ -103,6 +107,62 @@ function Application({ snapshot }: { snapshot: Snapshot }) {
       {selector}<section className="surface farmer-summary"><div className="section-header"><div><div className="eyebrow">RINGKASAN LOKASI SURVEI</div><h2>{plot.name} · {plot.district}</h2><p>{plot.crop} · catatan lahan Kementan</p></div></div>
         <p className="farmer-summary-text">{plotAction(plot)} Hujan terakhir yang tersedia: {rainfallText(latest.rain)} pada {monthLabel(latest.id)}. Data hujan berskala regional ±5,6 km.</p>
       </section>{forecastNotice}<section className="surface farmer-forecast"><div className="section-header"><div><h2>Proyeksi hujan 12 bulan mendatang</h2><p>Pola musiman untuk meninjau rencana tanam.</p></div></div><div className="farmer-rain"><ProjectionPanel projection={projection}/><EnvironmentContext environment={environment}/></div></section>
+      <section className="surface farmer-ai">
+        <div className="section-header">
+          <div>
+            <div className="eyebrow">PANDUAN BERBASIS DATA</div>
+            <h2>Panduan Kondisi Musim</h2>
+            <p>
+              Panduan awal berdasarkan data lahan dan proyeksi hujan.
+              Tetap perlu verifikasi penyuluh.
+            </p>
+          </div>
+        </div>
+
+        <div className="farmer-ai-list">
+          {farmerAI.recommendations.filter(item => !item.id.includes('-crop-')).map(item => (
+            <Card key={item.id} className="crop-card">
+              <CardContent>
+                <div className="crop-top">
+                  <span className="crop-symbol">
+                    {item.id.includes('-crop-') ? <Sprout size={20} /> : <CalendarDays size={20} />}
+                  </span>
+                  <span className="badge gray">
+                    {item.id.includes('-crop-') ? 'Kandidat tanam' : 'Panduan musim'}
+                  </span>
+                </div>
+                <h3>{item.title}</h3>
+                <p className="crop-note">{item.reason}</p>
+                <p><strong>Saran:</strong> {item.action}</p>
+                {item.suggestedPeriod && (<p><strong>Periode:</strong> {item.suggestedPeriod}</p>)}
+                <details>
+                  <summary>Bukti dan kebutuhan verifikasi</summary>
+                  <ul>
+                    {item.evidence.map((evidence, index) => (
+                      <li key={index}>
+                        {evidence.source}: {evidence.description}
+                      </li>
+                    ))}
+                  </ul>
+                  <strong>Data yang masih dibutuhkan:</strong>
+                  <ul>
+                    {item.missingData.map(data => (
+                      <li key={data}>{data}</li>
+                    ))}
+                  </ul>
+                </details>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <p className="farmer-disclaimer">
+          Informasi ini bukan penetapan kesesuaian tanaman atau
+          peringatan cuaca resmi. Pantau informasi BMKG dan
+          konsultasikan keputusan tanam dengan penyuluh.
+        </p>
+      </section>
+
       <section className="farmer-candidates"><div className="section-header"><div><div className="eyebrow">KANDIDAT UNTUK DITINJAU</div><h2>Bandingkan bukti komoditas.</h2><p>Suhu, tanah, dan air terkini belum lengkap.</p></div></div>{cropCards}</section>
       <footer className="farmer-disclaimer">Sumber: Kementan dan CHIRPS UCSB. Data diambil {dateLabel(snapshot.fetchedAt)}. Survei historis tidak membuktikan kondisi kebun saat ini.</footer>
     </div>{candidateSheet}</main>;
@@ -123,7 +183,56 @@ function Application({ snapshot }: { snapshot: Snapshot }) {
           <div className="survey-facts"><span>{plot.crop}</span><span>{irrigationLabel(plot.irrigation)}</span><span>{plot.area.toLocaleString('id-ID', { maximumFractionDigits: 4 })} ha · luas geometri</span></div>
           <div className="popover-weather"><strong>{rainfallText(projection?.months[0]?.rain ?? latest.rain)}</strong><span>{projection ? `Proyeksi ${monthLabel(projection.months[0].id)} · rentang ${projection.months[0].lower}–${projection.months[0].upper} mm` : `Hujan historis · ${monthLabel(latest.id)}`}</span></div><h3>Proyeksi hujan · 12 bulan mendatang</h3><ProjectionPanel projection={projection}/><EnvironmentContext environment={environment}/>
           <h3>Kandidat komoditas</h3>{profiles.map(c => <div className="popover-row" key={c.id}><span>{c.name}</span><span className="badge gray">{c.status}</span></div>)}
-          <h3>Rekomendasi tindakan lokasi</h3><p className="popover-advice">{plotAction(plot)}</p>
+
+          <h3>AI — Rekomendasi Intervensi</h3>
+
+          <div className="government-ai-recommendations">
+            {governmentAI.recommendations.map(item => (
+              <div className="popover-advice" key={item.id}>
+                <div className="popover-row">
+                  <strong>{item.title}</strong>
+                  <span className="badge gray">
+                    {item.priority === 'high' ? 'Verifikasi tinggi' : 'Verifikasi rutin'}
+                  </span>
+                </div>
+
+                <p>{item.reason}</p>
+                <p><strong>Tindakan:</strong> {item.action}</p>
+
+                {item.suggestedPeriod && (
+                  <p>
+                    <strong>Periode peninjauan:</strong>{' '}
+                    {item.suggestedPeriod}
+                  </p>
+                )}
+
+                <details>
+                  <summary>Bukti dan data yang dibutuhkan</summary>
+
+                  <ul>
+                    {item.evidence.map((evidence, index) => (
+                      <li key={index}>
+                        {evidence.source}: {evidence.description}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <strong>Perlu diverifikasi:</strong>
+                  <ul>
+                    {item.missingData.map(data => (
+                      <li key={data}>{data}</li>
+                    ))}
+                  </ul>
+                </details>
+              </div>
+            ))}
+
+            <p className="popover-advice">
+              Rekomendasi ini mendukung peninjauan penyuluh,
+              bukan keputusan otomatis penerima bantuan.
+            </p>
+          </div>
+
           <p className="popover-advice">Kelembapan tanah dan NDVI belum tersedia.</p>
           <div className="popover-actions"><button className="popover-calendar" onClick={() => setPage('calendar')}>Lihat data bulanan <ArrowRight size={14}/></button><Button size="sm" variant="secondary" onClick={() => setPage('report')}>Rencanakan semua lokasi</Button></div>
 

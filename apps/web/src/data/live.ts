@@ -1,13 +1,36 @@
 import type { MultiPolygon, Polygon } from 'geojson';
 
 export type RainMonth = { id: string; rain: number | null; pixel: string; source: string };
-export type ProjectionMonth = { id: string; rain: number; lower: number; upper: number };
+export type RainfallAnomaly = {
+  status:
+    | 'below-normal'
+    | 'near-normal'
+    | 'above-normal'
+    | 'insufficient-data';
+  deviationPercent: number | null;
+  signal:
+    | 'below-normal'
+    | 'above-normal'
+    | 'uncertain';
+};
+export type ProjectionMonth = {
+  id: string;
+  rain: number;
+  lower: number;
+  upper: number;
+  anomaly?: RainfallAnomaly;
+};
+export type MonthlyClimatology = {
+  month: number;
+  medianMm: number;
+  observations: number;
+};
 export type Projection = {
   pixel: string; issuedAt: string; kind: 'seasonal-projection'; method: string;
   training: { start: string; end: string; observations: number };
   validation: { selectionYears: string; calibrationYears: string; evaluationYears: string; maeMm: number; baselineMaeMm: number; intervalCoverage: number; evaluatedMonths: number };
   interval: { nominalCoverage: number; radiusMm: number; method: string };
-  confidence: 'low'; months: ProjectionMonth[]; limitations: string[];
+  confidence: 'low'; months: ProjectionMonth[]; climatology?: MonthlyClimatology[]; limitations: string[];
   aiSummary?: { provider: string; model: string; generatedAt: string; summary: string; watchMonths: string[]; actions: string[] };
 };
 export type WaterSample = { value: number | null; unit: string; period: { start: string; end: string }; pixel: string; resolutionDegrees: number[]; scale: number; source: string };
@@ -61,9 +84,18 @@ export function projectionFor(plot: Plot, snapshot: Snapshot) {
   return snapshot.projections?.byPixel[plot.rainfall.at(-1)?.pixel || ''] ?? null;
 }
 export function projectionSummary(projection: Projection | null) {
-  if (!projection) return 'Proyeksi belum tersedia. Angka masa depan tidak diisi tanpa model.';
-  const dry = [...projection.months].sort((a,b)=>a.rain-b.rain).slice(0,3);
-  return `Bulan yang diproyeksikan relatif lebih kering: ${dry.map(m=>monthLabel(m.id)).join(', ')}. Tinjau sumber air dan kebutuhan tanaman sebelum menentukan waktu tanam.`;
+  if (!projection) {
+    return 'Proyeksi belum tersedia. Angka masa depan tidak diisi tanpa model.';
+  }
+
+  const aiSummary = projection.aiSummary;
+
+  if (aiSummary?.provider === 'Gemini' && aiSummary.summary.trim()) {
+    return aiSummary.summary;
+  }
+
+  const dry = [...projection.months].sort((a, b) => a.rain - b.rain).slice(0, 3);
+  return `Bulan yang diproyeksikan relatif lebih kering: ${dry.map(m => monthLabel(m.id)).join(', ')}. Tinjau sumber air dan kebutuhan tanaman sebelum menentukan waktu tanam.`;
 }
 export function regionalGroups(snapshot: Snapshot) {
   const districts = [...new Set(snapshot.plots.map(p => p.district))];
