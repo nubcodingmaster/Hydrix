@@ -3,6 +3,12 @@ import { requestAnalysisBatch,generateAnalyses } from '../../scripts/gemini-anal
 const report={farmerSummary:'Review seasonal uncertainty with your extension adviser.',governmentSummary:'Review regional evidence before proposing public support.',crops:['0','1','2'].map(cropId=>({cropId,assessment:'Crop suitability remains conditional on field verification.'})),support:['water','soil','pest'].map(kind=>({kind,reason:'The available observations do not confirm current field conditions.',farmerAction:'Consult an extension adviser before deciding on inputs.',governmentAction:'Prepare verification and extension assistance before allocating inputs.',evidence:['survey']}))};
 const input={survey:{id:'a'},rainfall:{pixel:'cell',months:[{id:'2026-11'}]}};
 const json={analyses:[{locationId:'a',...report}],rainfallSummaries:[{pixel:'cell',summary:'The seasonal outlook remains uncertain; review local water availability.',watchMonths:['2026-11'],actions:['verify_water']}]};
+test('automatic generation cap stops a large refresh before spending generation quota or replacing the snapshot',async()=>{
+ const snapshot={fetchedAt:'2026-10-14',plots:['a','b'].map(id=>({id,crop:'Bawang merah',rainfall:[]}))};
+ let calls=0,saves=0;
+ const result=await generateAnalyses({snapshot,key:'test',model:'test-model',referenceMonth:'2026-10',maxNewLocations:1,generate:async()=>{calls++;throw new Error('Must not generate');},save:async()=>{saves++;}});
+ expect(result.failed).toBe(true);expect(result.error).toContain('Generation limit');expect(calls).toBe(0);expect(saves).toBe(0);
+});
 test('Gemini batch output must cover every requested location and reject truncated or invented output',async()=>{
  const options={key:'not-a-real-key',model:'test-model',fetcher:async()=>({ok:true,json:async()=>({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(json)}]}}]})})};
  const result=await requestAnalysisBatch([input],options);expect(result.analyses[0].farmerSummary).toBe(report.farmerSummary);

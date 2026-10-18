@@ -12,6 +12,6 @@ const snapshot=await read('majalengka');
 for(const name of ['projections','agronomy','environment']){const data=await read(name);if(data.baseFetchedAt!==snapshot.fetchedAt)throw new Error(`Mismatched ${name} snapshot`);snapshot[name]=data;}
 const existing=await readCachedAnalysis(()=>read('analysis'));
 const target=new URL('../public/data/analysis.json',import.meta.url),temporary=new URL('../public/data/analysis.tmp',import.meta.url);
-const result=await generateAnalyses({snapshot,key,model,existing,log:console.log,save:async data=>{const serialized=JSON.stringify(data);if(key.length>=20&&serialized.includes(key))throw new Error('Refusing to save credential material in model output');await writeFile(temporary,serialized);await rename(temporary,target);}});
+const result=await generateAnalyses({snapshot,key,model,existing,maxNewLocations:Number(process.env.AI_MAX_NEW_LOCATIONS??snapshot.plots.length),log:console.log,save:async data=>{const serialized=JSON.stringify(data);if(key.length>=20&&serialized.includes(key))throw new Error('Refusing to save credential material in model output');await writeFile(temporary,serialized);await rename(temporary,target);}});
 console.log(`Gemini coverage: ${Object.keys(result.output.byPlot).length}/${snapshot.plots.length} locations, ${Object.keys(result.output.byPixel).length}/${Object.keys(snapshot.projections.byPixel).length} rainfall pixels. New analyses: ${result.completed}.`);
 if(result.failed)process.exitCode=1;

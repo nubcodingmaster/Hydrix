@@ -25,7 +25,9 @@ npm run test:e2e
 
 The published-snapshot regression checks real analysis coverage and matching input fingerprints. Controlled AI browser fixtures test display and failure behavior separately; they are not published as provider-generated observations. Agent QA MCP was unavailable, so evidence comes from repository tests, actual provider generation and browser inspection.
 
-Local results: 53 unit tests passed, six browser tests passed and the production build succeeded. Strict verification accepted all 106 locations and ten rainfall pixels. A subsequent authenticated connection/cache check returned the configured model, zero new analyses and an unchanged SHA-256 for `analysis.json`. No configured Gemini key was found in tracked or non-ignored publication candidates. These local results do not substitute for the separate GitHub and Cloud Build run statuses.
+Local results after the cost-control regression: 54 unit tests passed, six browser tests passed and the production build succeeded. Strict verification accepted all 106 locations and ten rainfall pixels. A subsequent authenticated connection/cache check returned the configured model, zero new analyses and an unchanged SHA-256 for `analysis.json`. No configured Gemini key was found in tracked or non-ignored publication candidates. These local results do not substitute for the separate GitHub and Cloud Build run statuses.
+
+The initial [GitHub refresh run](https://github.com/nubcodingmaster/Hydrix/actions/runs/39145790097) succeeded using the repository secret, including the authenticated model check, full coverage validation, 53 unit tests and six browser tests. Cloud Build `bc3d3377-7d26-45d5-94db-32db3dfd83a9` successfully deployed commit `2c2adca` to Jakarta. The public `/health` endpoint returned `ok` with HTTP 200. The deployed analysis SHA-256 matched the tested local snapshot. CI actions were subsequently updated to verified official Node 24 runtime pins, with Ubuntu 24.04 selected explicitly to avoid the announced runner migration.
 
 ## Issues addressed
 
@@ -39,8 +41,12 @@ Local results: 53 unit tests passed, six browser tests passed and the production
 - The former `/healthz` path returned Google's frontend 404. The container endpoint is now `/health`, avoiding Cloud Run's reserved paths ending in `z`.
 - Unused component examples and generated review screenshots were removed from the tracked repository. Unrelated local output was preserved.
 
+## Cost controls
+
+Recurring AI refreshes are disabled. Automatic source/policy updates allow at most eight locations needing generation; larger refreshes require a manual workflow dispatch with explicit full-refresh selection. A regression test verifies that exceeding the cap makes zero generation requests and does not replace the snapshot. This controls workload rather than guaranteeing a currency spending limit.
+
 ## Limits
 
 The security review is defensive and local. No exploitation, scanning, load test, credential-access attempt or production red-team exercise was performed against Google or Kementan. Plaintext and claim guards do not prove every sentence correct or defeat every prompt injection.
 
-Vite reports a bundle-size warning. External quota and service availability remain outside test guarantees. Source acquisition is separate from the automatic AI interpretation schedule; dates are not relabeled as fresh observations. There are no field-confirmed aid recipients, pest diagnoses or soil NPK application rates in the connected data.
+Vite reports a bundle-size warning. External quota and service availability remain outside test guarantees. Source acquisition is separate from the change-triggered AI interpretation workflow; dates are not relabeled as fresh observations. There are no field-confirmed aid recipients, pest diagnoses or soil NPK application rates in the connected data.

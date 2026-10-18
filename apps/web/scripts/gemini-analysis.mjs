@@ -45,8 +45,9 @@ export async function verifyGeminiConnection({key,model,fetcher=fetch}) {
  return {model,totalTokens:result.totalTokens};
 }
 /** Persist every completed batch; a failed batch never destroys earlier validated results. */
-export async function generateAnalyses({snapshot,key,model,referenceMonth=currentMonth(),batchSize=4,existing,generate=requestAnalysisBatch,save,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms)),requestDelayMs=20000,log=()=>{}}) {
+export async function generateAnalyses({snapshot,key,model,referenceMonth=currentMonth(),batchSize=4,maxNewLocations=Infinity,existing,generate=requestAnalysisBatch,save,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms)),requestDelayMs=20000,log=()=>{}}) {
  if(!Number.isInteger(batchSize)||batchSize<1||batchSize>8)throw new Error('Invalid batch size');
+ if(maxNewLocations!==Infinity&&(!Number.isInteger(maxNewLocations)||maxNewLocations<0))throw new Error('Invalid generation limit');
  const output={schemaVersion:1,baseFetchedAt:snapshot.fetchedAt,promptVersion:PROMPT_VERSION,referenceMonth,model,byPlot:{},byPixel:{},fetchedAt:existing?.fetchedAt??new Date().toISOString()};
  const entries=await Promise.all(snapshot.plots.map(async plot=>{const input=buildAnalysisInput(snapshot,plot,referenceMonth);return {input,hash:await fingerprint(input)};}));
  for(const {input,hash} of entries)if(isCurrentAnalysis(existing?.byPlot?.[input.survey.id],hash,model))output.byPlot[input.survey.id]=existing.byPlot[input.survey.id];
@@ -56,6 +57,10 @@ export async function generateAnalyses({snapshot,key,model,referenceMonth=curren
   if(previous?.provider==='Gemini'&&previous.model===model&&previous.inputHash===hash){try{validateSummary(previous,input.rainfall.months);output.byPixel[input.rainfall.pixel]=previous;}catch{}}
  }
  const pending=entries.filter(({input})=>!output.byPlot[input.survey.id]||(input.rainfall&&!output.byPixel[input.rainfall.pixel]));
+ if(pending.length>maxNewLocations){
+  const error=`Generation limit: ${pending.length} locations need analysis; allowed ${maxNewLocations}. Run the manual workflow with full refresh enabled after reviewing quota.`;
+  log(`Stopped: ${error} No generation requests made.`);return {output,completed:0,failed:true,error};
+ }
  let completed=0;
  for(let start=0;start<pending.length;start+=batchSize){
   const batch=pending.slice(start,start+batchSize);

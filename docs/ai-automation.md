@@ -2,11 +2,15 @@
 
 The application is a static dashboard with a private generation pipeline. Visitors never receive a Gemini credential or an endpoint that can spend API quota.
 
-## Triggers and schedule
+## Triggers and cost controls
 
-`.github/workflows/refresh-ai.yml` runs after changes to published source snapshots, the shared planning policy or AI generation code. It also checks daily at 21:17 UTC, approximately 05:17 Asia/Makassar. Scheduled GitHub jobs may be delayed. A manual workflow dispatch is available for maintenance.
+`.github/workflows/refresh-ai.yml` runs after changes to published source snapshots, the shared planning policy or AI generation code. There is no recurring schedule. Opening the dashboard never calls Gemini. A manual workflow dispatch is available for maintenance.
 
-This is an analysis-refresh schedule, not an automatic refresh of Kementan, satellite or weather observations. Run the separate `data:sync` pipeline to acquire new source data with the necessary Earth Engine authorization. The AI cannot turn historical source dates into current measurements.
+This is analysis refresh, not an automatic refresh of Kementan, satellite or weather observations. Run the separate `data:sync` pipeline to acquire new source data with the necessary Earth Engine authorization. The AI cannot turn historical source dates into current measurements.
+
+Automatic runs permit at most eight locations needing generation. A larger change stops before any generation request and preserves the deployed snapshot. For a reviewed full refresh, run the workflow manually on `main` and enable `allow_full_refresh`; that permits at most 106 locations. Input hashes preserve valid cache entries, so an unchanged run generates nothing. This is a workload limit, not a currency spending cap. Google pricing, retries and other uses of the same key still affect billing.
+
+A reference-month change can invalidate all cached narratives. With no recurring job, an operator must review and run a full refresh when needed; stale narratives receive explicit fallbacks rather than being presented as current AI.
 
 ## Processing
 
@@ -17,7 +21,7 @@ This is an analysis-refresh schedule, not an automatic refresh of Kementan, sate
 5. Require complete current coverage, run tests and build the application before publishing.
 6. Commit only `apps/web/public/data/analysis.json` using the job's short-lived token. Refuse unrelated changes and never force-push. The existing Cloud Build trigger deploys the commit to Jakarta.
 
-If generation fails or quota is exhausted, the workflow fails visibly and does not commit partial results. Cloud Build also checks AI coverage before publishing a new image, so source changes without corresponding AI cannot replace the last successful deployment. Workflows use concurrency control to prevent overlapping scheduled publication.
+If generation fails or quota is exhausted, the workflow fails visibly and does not commit partial results. Cloud Build also checks AI coverage before publishing a new image, so source changes without corresponding AI cannot replace the last successful deployment. Workflows use concurrency control to prevent overlapping publication.
 
 ## Repository configuration
 
@@ -41,7 +45,7 @@ GitHub requires a nonempty value when creating a repository secret. Preparing a 
 | `EARTH_ENGINE_ACCESS_TOKEN` | Local environment only for temporary extraction | Expiring alternative to the service-account file; unsuitable for a durable scheduled setup |
 | `GITHUB_TOKEN` | Automatically supplied by GitHub | Short-lived publication token; do not create a personal-token secret |
 
-The current scheduled job consumes only the Gemini secret and model variable. Earth Engine credentials are not uploaded to Cloud Run or GitHub by this setup. Source acquisition remains a separate local workflow. The Cloud Build GitHub App connection handles deployment without a new service-account key in the repository.
+The current AI job consumes only the Gemini secret, model variable and generation-limit setting. Earth Engine credentials are not uploaded to Cloud Run or GitHub by this setup. Source acquisition remains a separate local workflow. The Cloud Build GitHub App connection handles deployment without a new service-account key in the repository.
 
 ## Operator checks
 

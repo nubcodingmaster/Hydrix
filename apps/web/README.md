@@ -27,7 +27,7 @@ npm run data:ai
 npm run data:verify:ai
 ```
 
-`data:sync` runs this sequence. Source acquisition is separate from the scheduled AI interpretation job. Snapshot writes use temporary files and atomic renames. Failed providers do not produce invented observations; compatible cached layers retain their original dates and are labeled accordingly.
+`data:sync` runs this sequence. Source acquisition is separate from the change-triggered AI interpretation job. Snapshot writes use temporary files and atomic renames. Failed providers do not produce invented observations; compatible cached layers retain their original dates and are labeled accordingly.
 
 ## Survey and rainfall
 
