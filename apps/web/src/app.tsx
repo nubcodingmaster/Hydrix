@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, CalendarDays, ChevronRight, CircleHelp, Database, ExternalLink, ClipboardList, Map, MapPin, Navigation, ShieldCheck, Sprout, Waves } from 'lucide-react';
+import { ArrowRight, CalendarDays, ChevronRight, CircleHelp, Database, ExternalLink, ClipboardList, Map, MapPin, Navigation, ShieldCheck, Sprout } from 'lucide-react';
 import { AnimatedSidebar, AnimatedSidebarProvider, AnimatedSidebarHeader, AnimatedSidebarContent, AnimatedSidebarFooter, AnimatedSidebarMenu, AnimatedSidebarMenuItem, AnimatedSidebarMenuButton, AnimatedSidebarTrigger, AnimatedSidebarInset } from '@/components/motion/animated-sidebar';
 import { Button } from '@/components/motion/button';
 import { Card, CardContent } from '@/components/motion/card';
@@ -26,7 +26,7 @@ export default function App() {
     loadSnapshot(controller.signal).then(setSnapshot).catch(error => { if (!controller.signal.aborted) setError(error.message); });
     return () => controller.abort();
   }, [attempt]);
-  if (!snapshot) return <main className="data-loading" role="status"><Waves size={36}/><h1>HYDRIX</h1><p>{error || 'Loading Kementan and CHIRPS data…'}</p>{error && <Button onClick={() => setAttempt(x => x + 1)}>Retry</Button>}</main>;
+  if (!snapshot) return <main className="data-loading" role="status"><img className="loading-logotype" src="/brand/hydrix-logotype.svg" alt="HYDRIX"/><p>{error || 'Loading Kementan and CHIRPS data…'}</p>{error && <Button onClick={() => setAttempt(x => x + 1)}>Retry</Button>}</main>;
   return <Application snapshot={snapshot}/>;
 }
 
@@ -88,7 +88,7 @@ function Application({ snapshot }: { snapshot: Snapshot }) {
   const candidateSheet = <BottomSheet open={selectedCandidate !== null} onOpenChange={open => { if (!open) setSelectedCandidate(null); }} snapPoints={[.65, .9]} title={selectedCandidate?.name || 'Planting considerations'} description="Survey evidence and remaining uncertainties"><div className="sheet-body"><p>{analysis?.crops.find(candidate => candidate.cropId === selectedCandidate?.id)?.assessment ?? 'Gemini crop assessment unavailable.'}</p><p>{selectedCandidate?.note}</p><p>Review {selectedCandidate?.unknown.toLowerCase()}.</p><div className="rotation-note"><ShieldCheck size={20}/><p>All three crops belong to Allium. Rotation within the same family does not automatically break pest cycles.</p></div><Button onClick={() => setSelectedCandidate(null)}>Understood</Button></div></BottomSheet>;
 
   if (mode === 'farmer') return <main className="farmer-page">
-    <header className="farmer-top"><a className="farmer-brand" href="?view=farmer"><span className="brand-logo"><Waves size={22}/></span><strong>HYDRIX</strong></a><button className="plain-link" onClick={changeMode}>Regional map</button></header>
+    <header className="farmer-top"><a className="farmer-brand" href="?view=farmer"><img className="brand-logotype" src="/brand/hydrix-logotype.svg" alt="HYDRIX"/></a><button className="plain-link" onClick={changeMode}>Regional map</button></header>
     <div className="farmer-content"><section className="farmer-hero"><div className="eyebrow">LAND & SEASONS · MAJALENGKA</div><h1>Your land and seasons, clearly explained.</h1><p>Survey evidence and seasonal rainfall to help you review planting options.</p><Button variant="secondary" onClick={locate}><Navigation size={15}/>Use my location</Button>{locationStatus && <p className="location-status" role="status">{locationStatus}</p>}</section>
       {selector}<section className="surface farmer-summary"><div className="section-header"><div><div className="eyebrow">SURVEY LOCATION SUMMARY</div><h2>{plot.name} · {plot.district}</h2><p>{cropLabel(plot.crop)} · Kementan land survey</p></div></div>
         <p className="farmer-summary-text">{analysis?.farmerSummary ?? 'Gemini analysis unavailable for this location. Review source observations with an extension adviser.'} Latest available rainfall: {rainfallText(latest.rain)} in {monthLabel(latest.id)}. Rainfall data uses a regional grid of approximately 5.6 km.</p>
@@ -99,7 +99,7 @@ function Application({ snapshot }: { snapshot: Snapshot }) {
 
   return <AnimatedSidebarProvider className="app-shell" defaultOpen>
     <AnimatedSidebar className="hydrix-sidebar" panelClassName="sidebar-panel" ariaLabel="HYDRIX navigation" collapsible="icon">
-      <AnimatedSidebarHeader className="brand-header"><div className="brand"><span className="brand-logo"><Waves size={24}/></span><div><strong>HYDRIX</strong><small>GROW WITH FORESIGHT</small></div></div></AnimatedSidebarHeader>
+      <AnimatedSidebarHeader className="brand-header"><div className="brand"><img className="brand-logotype" src="/brand/hydrix-logotype.svg" alt="HYDRIX"/></div></AnimatedSidebarHeader>
       <AnimatedSidebarContent className="sidebar-content"><AnimatedSidebarMenu>{pages.map(item => <AnimatedSidebarMenuItem key={item.id}><AnimatedSidebarMenuButton icon={<item.icon size={18}/>} isActive={page === item.id} onSelect={() => { setPage(item.id); setPopupOpen(false); }} className="nav-item">{item.label}</AnimatedSidebarMenuButton></AnimatedSidebarMenuItem>)}</AnimatedSidebarMenu></AnimatedSidebarContent>
 
     </AnimatedSidebar>
