@@ -1,6 +1,10 @@
 # Deploy HYDRIX to Cloud Run
 
-Google Cloud project: `hydrix-512010` (HYDRIX). Suggested demo service: `hydrix`, region `us-central1`, request-based billing, minimum zero instances and maximum one instance.
+Google Cloud project: `hydrix-512010` (HYDRIX). Suggested demo service: `hydrix`, region `asia-southeast2` (Jakarta), request-based billing, minimum zero instances and maximum one instance.
+
+The Jakarta service is `https://hydrix-724949319680.asia-southeast2.run.app/`. Initial migration requires authentication until public access is explicitly approved. The previous `us-central1` service is retained during validation; its URL is not the Jakarta endpoint.
+
+The existing GitHub trigger `d7b90225-363e-4b11-b1c8-7cc980653d55` is named `hydrix-jakarta-github-main` and targets `_DEPLOY_REGION=asia-southeast2`. Its trigger location is still `global`, and its current Artifact Registry repository is still in `us-central1`. Changing the Cloud Build dashboard's region filter does not migrate either a Cloud Run service or a trigger. This migration places the application runtime in Jakarta; it does not claim all build artifacts or services reside exclusively in APAC.
 
 The container serves the Vite production build with Nginx on Cloud Run's `PORT`. It includes published data snapshots. Gemini runs in the local data-generation workflow; no API key or service-account file is required by this website container. Source and Docker build contexts use explicit allowlists to exclude local credentials, caches, dependencies, and test artifacts. The Nginx configuration serves module workers with a JavaScript MIME type and allows SPA navigation.
 
@@ -11,7 +15,7 @@ git clone https://github.com/nubcodingmaster/Hydrix.git
 cd Hydrix
 gcloud run deploy hydrix \
   --project=hydrix-512010 \
-  --region=us-central1 \
+  --region=asia-southeast2 \
   --source=apps/web \
   --port=8080 \
   --cpu=1 \
