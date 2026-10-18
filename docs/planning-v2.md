@@ -1,5 +1,7 @@
 # Evidence-gated monthly planning
 
+Historical policy, superseded by [planning-v3](planning-v3.md) on October 18, 2026.
+
 Updated October 18, 2026. `planning-v2` replaces three automatic proposals for every survey location with explicit screening. The previous 318 cards described administrative readiness tasks; they were not evidence of 318 actual assistance needs.
 
 ## Decisions and calendar

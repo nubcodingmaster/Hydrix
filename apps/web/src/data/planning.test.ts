@@ -22,8 +22,10 @@ describe('evidence-gated monthly planning',()=>{
  });
  it('screens the real snapshot without manufacturing three proposals per location or confirmed recipients',()=>{
   const plan=buildPlanning(real,date);
-  expect(plan.items.length).toBeLessThan(real.plots.length);
-  expect(plan.items.every(item=>item.stage==='verification'&&item.kind!=='soil')).toBe(true);
+  expect(plan.items.length).toBeLessThan(real.plots.length*3);
+  expect(plan.items.some(item=>item.kind==='water')).toBe(true);
+  expect(plan.items.some(item=>item.kind==='soil')).toBe(true);
+  expect(plan.items.every(item=>item.stage==='verification')).toBe(true);
   expect(plan.items.filter(item=>item.stage==='confirmed')).toHaveLength(0);
   expect(plan.farmerGroupsLinked).toBe(false);
  });
@@ -40,26 +42,59 @@ describe('evidence-gated monthly planning',()=>{
    expect(buildPlanning(data,date).items,JSON.stringify(change)).toHaveLength(0);
   }
  });
- it('requires reliable rainfall intervals below the historical median for consecutive months',()=>{
-  const {data,projection}=fixture();Object.assign(projection.months[0],{rain:10,lower:0,upper:20});
-  expect(buildPlanning(data,date).items).toHaveLength(0);
-  Object.assign(projection.months[1],{rain:15,lower:0,upper:25});
-  const item=buildPlanning(data,date).items[0];expect(item).toMatchObject({kind:'water',stage:'verification',eventMonth:'2026-11',actionMonth:'2026-10'});
-  expect(buildPlanning(data,date).items).toHaveLength(1);
-  projection.confidence='low';expect(buildPlanning(data,date).items).toHaveLength(0);
+ it('plans irrigation support before consecutive low-rainfall months even with low confidence',()=>{
+  const {data,projection}=fixture();projection.confidence='low';
+  Object.assign(projection.months[6],{rain:90,lower:0,upper:200});
+  Object.assign(projection.months[7],{rain:70,lower:0,upper:180});
+  const water=buildPlanning(data,date).items.filter(item=>item.kind==='water');
+  expect(water).toHaveLength(1);expect(water[0]).toMatchObject({eventMonth:'2027-05',eventEndMonth:'2027-06',actionMonth:'2027-02',stage:'verification'});
+  expect(water[0].outlook).toContain('low');expect(water[0].action).toContain('irrigation support');
+  expect(water[0].outlook).toContain('200');
+ });
+ it('does not multiply one dry run into monthly proposals, and separates later runs',()=>{
+  const {data,projection}=fixture();
+  for(const i of [0,1,2,5,6])Object.assign(projection.months[i],{rain:40,lower:0,upper:150});
+  expect(buildPlanning(data,date).items.filter(item=>item.kind==='water').map(item=>item.eventMonth)).toEqual(['2026-11','2027-04']);
  });
  it('includes late rainfall events when their preparation date is inside the horizon',()=>{
   const {data,projection}=fixture();
-  for(const month of projection.months.slice(-2))Object.assign(month,{rain:10,lower:0,upper:20});
-  expect(buildPlanning(data,date).items).toHaveLength(1);
+  for(const month of projection.months.slice(-2))Object.assign(month,{rain:10,lower:0,upper:120});
   expect(buildPlanning(data,date).items[0]).toMatchObject({eventMonth:'2027-09',actionMonth:'2027-06'});
  });
- it('does not schedule from uncertain, sparse or expired rainfall evidence',()=>{
-  const {data,projection}=fixture();for(const month of projection.months)Object.assign(month,{rain:10,lower:0,upper:150});
-  expect(buildPlanning(data,date).items).toHaveLength(0);
-  for(const month of projection.months)month.upper=20;
-  projection.history=projection.history!.slice(0,12);expect(buildPlanning(data,date).items).toHaveLength(0);
-  expect(buildPlanning(real,new Date('2030-01-01')) .items).toHaveLength(0);
+ it('rejects isolated, nonconsecutive, invalid or expired rainfall evidence',()=>{
+  for(const changes of [[{id:'2027-01',rain:30,lower:0,upper:130}],[{id:'2027-01',rain:30,lower:0,upper:130},{id:'2027-03',rain:40,lower:0,upper:140}],[{id:'2027-01',rain:NaN,lower:0,upper:130},{id:'2027-02',rain:30,lower:0,upper:130}],[{id:'2027-01',rain:30,lower:50,upper:130},{id:'2027-02',rain:30,lower:0,upper:130}]]){
+   const {data,projection}=fixture();projection.months=changes;
+   expect(buildPlanning(data,date).items).toHaveLength(0);
+  }
+  expect(buildPlanning(real,new Date('2030-01-01')).items.filter(item=>item.kind!=='soil')).toHaveLength(0);
+ });
+ it('proposes targeted soil improvement for acidic shallot soil without inventing an NPK dose',()=>{
+  const {data,plot}=fixture();plot.crop='Bawang merah';
+  const agronomy=data.agronomy!.byPlot[plot.id];
+  agronomy.ph=structuredClone(real.agronomy!.byPlot['bawang-merah-432']?.ph??Object.values(real.agronomy!.byPlot).find(p=>p.ph)!.ph)!;
+  agronomy.ph.depths=[{depthCm:10,value:5.2}];
+  const item=buildPlanning(data,date).items.find(item=>item.kind==='soil')!;
+  expect(item).toMatchObject({actionMonth:'2026-10',eventMonth:null,stage:'verification'});
+  expect(item.outlook).toContain('5.2');expect(item.action).toContain('dolomite');expect(item.action).toContain('N, P and K');
+  expect(item.action).not.toMatch(/\d+\s*(kg|ton)/);
+ });
+ it('uses carbon g/kg correctly and does not apply shallot pH thresholds to other crops',()=>{
+  const {data,plot}=fixture();plot.crop='Bawang merah';
+  const agronomy=data.agronomy!.byPlot[plot.id];
+  const sample=structuredClone(Object.values(real.agronomy!.byPlot).find(p=>p.carbon)!.carbon)!;
+  agronomy.ph={...sample,unit:'pH',depths:[{depthCm:10,value:6}]};
+  agronomy.carbon={...sample,unit:'g/kg',depths:[{depthCm:10,value:19}]};
+  expect(buildPlanning(data,date).items.find(item=>item.kind==='soil')?.action).toContain('mature compost');
+  agronomy.carbon.depths[0].value=20;expect(buildPlanning(data,date).items).toHaveLength(0);
+  agronomy.ph.depths[0].value=5.2;plot.crop='Bawang daun';expect(buildPlanning(data,date).items).toHaveLength(0);
+  plot.crop='Bawang merah';agronomy.ph.depths[0].value=Infinity;expect(buildPlanning(data,date).items).toHaveLength(0);
+ });
+ it('does not recommend lime for alkaline soil and does not invent support from normal or missing soil',()=>{
+  const {data,plot}=fixture();plot.crop='Bawang merah';const soil=data.agronomy!.byPlot[plot.id];
+  const sample=structuredClone(Object.values(real.agronomy!.byPlot).find(p=>p.ph)!.ph)!;
+  soil.ph={...sample,depths:[{depthCm:10,value:7}]};
+  expect(buildPlanning(data,date).items.find(item=>item.kind==='soil')?.action).toContain('do not supply lime');
+  for(const value of [5.6,6.5,null]){soil.ph.depths[0].value=value;expect(buildPlanning(data,date).items).toHaveLength(0);}
  });
  it('includes exactly twelve preparation months and respects Makassar month/year boundaries',()=>{
   expect(shiftMonth('2027-01',-3)).toBe('2026-10');
@@ -68,11 +103,17 @@ describe('evidence-gated monthly planning',()=>{
   expect(plan.months[0]).toBe('2026-11');expect(plan.months.at(-1)).toBe('2027-10');
  });
  it('AI can explain a qualifying check but cannot create eligibility, dates or confirmed need',()=>{
-  const {data,plot,vegetation}=fixture();
+  const {data,plot,vegetation,projection}=fixture();
   data.analysis={model:'gemini-test',referenceMonth:'2026-10',byPlot:{[plot.id]:{provider:'Gemini',model:'gemini-test',generatedAt:'2026-10-18',inputHash:'verified',promptVersion:'test',farmerSummary:'Review with your adviser.',governmentSummary:'Coordinate field verification.',crops:[],support:['water','soil','pest'].map(kind=>({kind:kind as 'water'|'soil'|'pest',reason:'Invented imminent threat.',farmerAction:'Review observations with an adviser.',governmentAction:'Arrange extension-led field verification.',evidence:['survey','vegetation']}))}}};
   expect(buildPlanning(data,date).items).toHaveLength(0);
   vegetation.ndvi=.3;const item=buildPlanning(data,date).items[0];
   expect(item.action).toContain('Arrange extension-led field verification.');expect(item.outlook).not.toContain('Invented');
   expect(item.stage).toBe('verification');expect(item.actionMonth).toBe('2026-10');expect(item.analysisProvider).toBe('Gemini');
+  for(const month of projection.months.slice(0,2))Object.assign(month,{rain:30,lower:0,upper:140});
+  const advice=data.analysis.byPlot[plot.id].support.find(s=>s.kind==='water')!;
+  advice.evidence=['rainfall'];advice.governmentAction='Baseflow declines during the dry period.';
+  expect(buildPlanning(data,date).items.find(item=>item.kind==='water')?.action).not.toContain('Baseflow declines');
+  advice.governmentAction='Coordinate shared pump servicing with village extension staff.';
+  expect(buildPlanning(data,date).items.find(item=>item.kind==='water')?.action).toContain(advice.governmentAction);
  });
 });

@@ -70,10 +70,17 @@ test('planning screens signals, groups twelve months and filters month and year 
   await expect(page.getByRole('button',{name:'Sources & data quality',exact:true})).toHaveCount(0);
   await expect(page.locator('.planning-action').first().locator('span')).toHaveText('Suggested support');
   expect(await page.locator('.planning-card').first().evaluate(element=>getComputedStyle(element).borderTopWidth)).toBe('1px');
+  await page.getByRole('button',{name:'Support category',exact:true}).click();await page.getByRole('option',{name:'Water readiness',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Prepare irrigation support for projected dry months'}).first()).toBeVisible();
+  await expect(page.locator('.planning-outlook').first()).toContainText('Model confidence: low');
+  await page.getByRole('button',{name:'Support category',exact:true}).click();await page.getByRole('option',{name:'Soil & fertilizer support',exact:true}).click();
+  await expect(page.locator('.planning-action').first()).toContainText('dolomite');
+  await expect(page.locator('.planning-action').first()).toContainText('N, P and K');
+  await page.getByRole('button',{name:'Support category',exact:true}).click();await page.getByRole('option',{name:'All support types',exact:true}).click();
   await page.getByRole('button',{name:'Planning year',exact:true}).click();await page.getByRole('option',{name:'2027',exact:true}).click();
-  await page.getByRole('button',{name:'Planning month',exact:true}).click();await page.getByRole('option',{name:'March',exact:true}).click();
+  await page.getByRole('button',{name:'Planning month',exact:true}).click();await page.getByRole('option',{name:'January',exact:true}).click();
   await expect(page.locator('.planning-month')).toHaveCount(1);
-  await expect(page.getByRole('region',{name:'Planning for March 2027',exact:true})).toBeVisible();
+  await expect(page.getByRole('region',{name:'Planning for January 2027',exact:true})).toBeVisible();
   await expect(page.locator('.planning-card')).toHaveCount(0);
   await page.getByRole('button',{name:'Planning year',exact:true}).click();await page.getByRole('option',{name:'2026',exact:true}).click();
   await expect(page.getByRole('button',{name:'Planning month',exact:true})).toHaveText('All months');
@@ -83,7 +90,7 @@ test('planning screens signals, groups twelve months and filters month and year 
   await expect(page.locator('.planning-card')).toHaveCount(0);
   await page.getByRole('button',{name:'Support category',exact:true}).click();await page.getByRole('option',{name:'All support types',exact:true}).click();
   await page.getByRole('button',{name:'Confirmed assistance (0)',exact:true}).click();await expect(page.locator('.planning-card')).toHaveCount(0);
-  await page.getByRole('button',{name:/^Field checks \(/}).click();
+  await page.getByRole('button',{name:/^Support proposals \(/}).click();
   await expect(page.locator('.planning-card')).not.toHaveCount(0);
   const first=page.locator('.planning-card').first(),locationText=await first.locator('.planning-location').innerText();
   const plot=data.plots.find((plot:{name:string;district:string})=>locationText===`${plot.name} · ${plot.district}`);
