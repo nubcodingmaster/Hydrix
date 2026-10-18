@@ -1,3 +1,5 @@
+import {planningPolicy,shiftMonth,dryRuns} from './planning-policy.mjs';
+export {planningPolicy,shiftMonth} from './planning-policy.mjs';
 import type { SoilSample } from './agronomy';
 import { analysisEvidence } from './ai';
 import { cropLabel, projectionFor, type Plot, type Snapshot } from './live';
@@ -9,14 +11,8 @@ export type PlanItem = {
  eventMonth: string | null; eventEndMonth?: string; actionMonth: string; action: string;
  evidence: PlanEvidence[]; basis: string; timingBasis: string; analysisProvider?: 'Gemini'; analysisModel?: string;
 };
-/** Pilot screening policy, not calibrated crop damage or assistance eligibility thresholds. */
-export const planningPolicy = { ndviDrop: .15, ndviRelativeDrop: .3, previousNdvi: .3, validCoverage: .8, recentDays: 30, dryMonthMm: 100, dryRunMonths: 2, waterLeadMonths: 3, shallotMinPh: 5.6, shallotMaxPh: 6.5, lowCarbonGKg: 20 };
 export function planningDate(date: Date) {
  return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Makassar',year:'numeric',month:'2-digit',day:'2-digit'}).format(date);
-}
-const index=(month:string)=>Number(month.slice(0,4))*12+Number(month.slice(5,7))-1;
-export function shiftMonth(month:string,count:number) {
- const value=index(month)+count;return `${Math.floor(value/12)}-${String(((value%12)+12)%12+1).padStart(2,'0')}`;
 }
 const number=(value:number)=>value.toLocaleString('en-US',{maximumFractionDigits:2});
 const fresh=(end:string,today:string,days:number)=>{const age=(Date.parse(today)-Date.parse(end))/86400000;return Number.isFinite(age)&&age>=0&&age<=days;};
@@ -72,15 +68,8 @@ export function buildPlanning(snapshot:Snapshot,referenceDate=new Date()) {
   }
   const projection=projectionFor(plot,snapshot);
   if(!projection||!fresh(projection.issuedAt.slice(0,10),asOf,60))continue;
-  const screened=[...new Map(projection.months.filter(month=>/^\d{4}-(0[1-9]|1[0-2])$/.test(month.id)&&month.id>=currentMonth).map(month=>[month.id,month])).values()].sort((a,b)=>a.id.localeCompare(b.id)).map(month=>{
-   const valid=[month.rain,month.lower,month.upper].every(Number.isFinite)&&month.lower>=0&&month.lower<=month.rain&&month.rain<=month.upper;
-   return {...month,signal:valid&&month.rain<planningPolicy.dryMonthMm};
-  });
-  for(let i=0;i<screened.length;i++){
-   const first=screened[i];if(!first.signal)continue;
-   const run=[first];
-   while(i+1<screened.length&&screened[i+1].signal&&shiftMonth(screened[i].id,1)===screened[i+1].id)run.push(screened[++i]);
-   if(run.length<planningPolicy.dryRunMonths)continue;
+  for(const run of dryRuns(projection,currentMonth)){
+   const first=run[0];
    const last=run.at(-1)!,preparation=shiftMonth(first.id,-planningPolicy.waterLeadMonths),actionMonth=preparation<currentMonth?currentMonth:preparation;
    if(!months.includes(actionMonth))continue;
    items.push({...base,id:`${plot.id}:water:${first.id}`,stage:'verification',kind:'water',title:'Prepare irrigation support for projected dry months',eventMonth:first.id,eventEndMonth:last.id,actionMonth,

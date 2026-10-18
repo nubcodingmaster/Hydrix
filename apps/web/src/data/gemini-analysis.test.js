@@ -17,6 +17,9 @@ test('saves each successful batch before a quota failure and resumes without reg
  expect(Object.keys(saved.byPlot)).toEqual(['a']);expect(first.failed).toBe(true);
  const resumed=await generateAnalyses({snapshot,key:'test',model:'test-model',referenceMonth:'2026-10',batchSize:1,existing:saved,generate:async inputs=>({analyses:inputs.map(input=>({locationId:input.survey.id,...report})),rainfallSummaries:[]}),save:async value=>{saved=structuredClone(value)},wait:async()=>{},requestDelayMs:0});
  expect(resumed.completed).toBe(1);expect(Object.keys(saved.byPlot).sort()).toEqual(['a','b']);
+ const current=structuredClone(saved);
+ const cached=await generateAnalyses({snapshot,key:'test',model:'test-model',referenceMonth:'2026-10',existing:current,generate:async()=>{throw new Error('Current cache must not call Gemini');},save:async value=>{saved=structuredClone(value);}});
+ expect(cached.completed).toBe(0);expect(saved).toEqual(current);
 });
 
 test('an invalid optional cache does not prevent fresh generation while real file errors still surface', async()=>{

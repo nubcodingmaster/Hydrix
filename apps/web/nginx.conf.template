@@ -7,7 +7,7 @@ server {
     add_header X-Content-Type-Options nosniff always;
     add_header Referrer-Policy strict-origin-when-cross-origin always;
 
-    location = /healthz {
+    location = /health {
         access_log off;
         default_type text/plain;
         return 200 "ok\n";

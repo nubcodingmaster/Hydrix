@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, CalendarDays, ChevronRight, CircleHelp, Database, ExternalLink, ClipboardList, Map, MapPin, Navigation, ShieldCheck, Sprout } from 'lucide-react';
-import { AnimatedSidebar, AnimatedSidebarProvider, AnimatedSidebarHeader, AnimatedSidebarContent, AnimatedSidebarFooter, AnimatedSidebarMenu, AnimatedSidebarMenuItem, AnimatedSidebarMenuButton, AnimatedSidebarTrigger, AnimatedSidebarInset } from '@/components/motion/animated-sidebar';
+import { ArrowRight, CalendarDays, ChevronRight, CircleHelp, Database, ExternalLink, ClipboardList, Map, MapPin, Navigation, ShieldCheck } from 'lucide-react';
+import { AnimatedSidebar, AnimatedSidebarProvider, AnimatedSidebarHeader, AnimatedSidebarContent, AnimatedSidebarMenu, AnimatedSidebarMenuItem, AnimatedSidebarMenuButton, AnimatedSidebarTrigger, AnimatedSidebarInset } from '@/components/motion/animated-sidebar';
 import { Button } from '@/components/motion/button';
 import { Card, CardContent } from '@/components/motion/card';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/motion/select';

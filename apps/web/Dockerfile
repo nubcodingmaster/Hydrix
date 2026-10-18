@@ -6,9 +6,9 @@ COPY index.html tsconfig.json vite.config.ts ./
 COPY src ./src
 COPY components ./components
 COPY lib ./lib
-COPY scripts/analysis-contract.mjs scripts/analysis-contract.d.mts ./scripts/
+COPY scripts/analysis-contract.mjs scripts/analysis-contract.d.mts scripts/gemini-summary.mjs scripts/gemini-summary.d.mts scripts/verify-data.mjs ./scripts/
 COPY public ./public
-RUN npm run build
+RUN npm run data:verify:ai && npm run build
 
 FROM nginx:alpine
 ENV PORT=8080

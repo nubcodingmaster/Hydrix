@@ -17,3 +17,6 @@
 !scripts/analysis-contract.d.mts
 !public/
 !public/**
+!scripts/gemini-summary.mjs
+!scripts/verify-data.mjs
+!scripts/gemini-summary.d.mts

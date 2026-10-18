@@ -8,3 +8,5 @@ export function validateAnalysis(value: unknown, input?: unknown): unknown;
 export function isCurrentAnalysis(value: unknown, hash: string, model: string): boolean;
 
 export function groundingIssues(value: unknown): string[];
+
+export function isSafeAIText(value:unknown,min?:number,max?:number):boolean;

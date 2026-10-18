@@ -1,5 +1,6 @@
 /** Shared by the offline generator and browser: facts, validation and cache identity. */
-export const PROMPT_VERSION = 'hydrix-gemini-analysis-v2';
+import {planningPolicy,shiftMonth,dryRuns} from '../src/data/planning-policy.mjs';
+export const PROMPT_VERSION = 'hydrix-gemini-analysis-v3';
 export const EVIDENCE_KEYS = ['survey', 'rainfall', 'soil', 'weather', 'vegetation', 'water'];
 export const currentMonth = () => new Intl.DateTimeFormat('sv-SE', {year:'numeric',month:'2-digit',timeZone:'Asia/Makassar'}).format(new Date());
 const rounded = value => Math.round(value * 10) / 10;
@@ -33,22 +34,22 @@ export function buildAnalysisInput(snapshot, plot, referenceMonth=currentMonth()
  const agronomy=snapshot.agronomy?.byPlot[plot.id];
  const environment=snapshot.environment?.byPlot[plot.id];
  const rainfall=rainfallFacts(snapshot.projections?.byPixel[pixel]);
- const driest=rainfall?.months.filter(month=>month.id>=referenceMonth).sort((a,b)=>a.rain-b.rain||a.id.localeCompare(b.id))[0];
- const shift=(id,delta)=>{const [year,month]=id.split('-').map(Number);return new Date(Date.UTC(year,month-1+delta,1)).toISOString().slice(0,7);};
- const preparation=driest?shift(driest.id,-3):null;
+ const dryRun=dryRuns(rainfall,referenceMonth)[0];
+ const preparation=dryRun?shiftMonth(dryRun[0].id,-planningPolicy.waterLeadMonths):null;
  return {
   promptVersion:PROMPT_VERSION, referenceMonth, baseFetchedAt:snapshot.fetchedAt,
   survey:Object.fromEntries(['id','name','district','village','crop','surveyDate','irrigation'].map(key=>[key,plot[key]??null])),
   rainfall,
-  planning:{waterWindow:driest?.id??null,waterPrepareBy:preparation&&preparation<referenceMonth?referenceMonth:preparation,soilReviewSlot:shift(referenceMonth,2),pestOutbreakMonth:null,note:'Calendar slots are administrative planning assumptions, not predicted hazard dates. Water support is specifically preparation for the lowest-rainfall window, not an assertion of drought.'},
+  planning:{waterWindow:dryRun?.[0].id??null,waterWindowEnd:dryRun?.at(-1).id??null,waterPrepareBy:preparation?(preparation<referenceMonth?referenceMonth:preparation):null,waterPolicy:{dryMonthMm:planningPolicy.dryMonthMm,consecutiveMonths:planningPolicy.dryRunMonths,leadMonths:planningPolicy.waterLeadMonths,lowConfidenceIncluded:true},soilReviewSlot:referenceMonth,soilPolicy:{shallotMinPh:planningPolicy.shallotMinPh,shallotMaxPh:planningPolicy.shallotMaxPh,lowCarbonGKg:planningPolicy.lowCarbonGKg},pestOutbreakMonth:null,note:'Calendar slots are administrative preparation assumptions. Water readiness uses consecutive projected dry months, not a confirmed water deficit. Soil allocation needs current testing.'},
   latestRainfall:plot.rainfall.map(({id,rain})=>({id,rain})),
   agronomy:Object.fromEntries(['ph','carbon','texture','weather','vegetation'].map(key=>[key,sample(agronomy?.[key])])),
   water:Object.fromEntries(['aeti','ret','cropland'].map(key=>[key,sample(environment?.[key])])),
   candidates:['Bawang merah','Bawang daun','Bawang putih'].map((name,index)=>({cropId:String(index),name,historicalSurveyCount:snapshot.plots.filter(p=>p.crop===name).length,testRecordsExcluded:name==='Bawang putih'})),
  };
 }
+export const isSafeAIText=(value,min=15,max=1000)=>typeof value==='string'&&value.trim().length>=min&&value.length<=max&&!/\d/.test(value)&&!/[<>\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value)&&!/(?:ignore|disregard)\s+(?:all\s+)?(?:previous|system)\s+instructions/i.test(value);
 export function validateAnalysis(value, input) {
- const text=value=>typeof value==='string'&&value.trim().length>=15&&value.length<=1000&&!/\d/.test(value);
+ const text=isSafeAIText;
  if(!value||!text(value.farmerSummary)||!text(value.governmentSummary))throw new Error('Invalid AI audience summary');
  if(!Array.isArray(value.crops)||value.crops.length!==3||new Set(value.crops.map(c=>c.cropId)).size!==3||!value.crops.every(c=>['0','1','2'].includes(c.cropId)&&text(c.assessment)))throw new Error('Invalid AI crop coverage');
  if(!Array.isArray(value.support)||value.support.length!==3||new Set(value.support.map(s=>s.kind)).size!==3||!value.support.every(s=>['water','soil','pest'].includes(s.kind)&&text(s.reason)&&text(s.farmerAction)&&text(s.governmentAction)&&Array.isArray(s.evidence)&&s.evidence.length>0&&s.evidence.every(key=>EVIDENCE_KEYS.includes(key))))throw new Error('Invalid AI support evidence');
@@ -74,7 +75,7 @@ export function groundingIssues(value) {
  for(const text of texts)for(const sentence of text.split(/(?<=[.!?])\s+/)){
   if(/\b(well[ -]suited|suitable for|suited for|suited to|ideal for)\b/i.test(sentence)&&!conditional.test(sentence))issues.push('Crop suitability is unconfirmed; describe a conditional candidate requiring field verification');
   if(/\b(indicat\w*|reflect\w*|points? to|due to|caused by|confirm\w*|because)\b/i.test(sentence)&&/\b(harvest\w*|land clearing|infestation|pest outbreak)\b/i.test(sentence)&&!conditional.test(sentence)&&!/\b(assess|confirm|check|verify|determine)\s+whether\b/i.test(sentence))issues.push('NDVI does not establish harvest, clearing or pest cause; present possible causes and require field scouting');
-  if(/\b(seasonal (?:flow|stream drops|low flows)|stream(?:flow| flows?| levels?)\s+(?:drops?|declines?|diminish\w*|ebb\w*|reaches annual minimums)|shallow supplies dry out|flow (?:diminishes|declines|increases)|water supply (?:diminishes|declines)|evapotranspiration.{0,60}(?:persists|will|continues|rises|falls|contracts))\b/i.test(sentence)&&!conditional.test(sentence))issues.push('No seasonal irrigation-flow or future evapotranspiration series is supplied; use dated observations and rainfall uncertainty only');
+  if(/\b(seasonal (?:flow|stream drops|low flows)|(?:baseflow|streamflow|stream flows?|stream levels?)\s+(?:drops?|declines?|diminish\w*|ebb\w*|reaches annual minimums)|shallow supplies dry out|flow (?:diminishes|declines|increases)|water supply (?:diminishes|declines)|evapotranspiration.{0,60}(?:persists|will|continues|rises|falls|contracts))\b/i.test(sentence)&&!conditional.test(sentence))issues.push('No seasonal irrigation-flow or future evapotranspiration series is supplied; use dated observations and rainfall uncertainty only');
  }
  if(texts.some(text=>/\b(?:scout\w*|check(?:ing)? (?:plant|crop|field)|field walks?|crop inspections?|crop health checks?)\b[^.!?]*\b(?:weekly|daily)\b|\b(?:weekly|daily)\b[^.!?]*\b(?:field walks?|crop inspections?|crop health checks?)\b/i.test(text)))issues.push('No calibrated scouting schedule is supplied; recommend field scouting without a fixed daily or weekly frequency');
  return [...new Set(issues)];

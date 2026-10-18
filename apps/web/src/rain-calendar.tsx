@@ -3,7 +3,7 @@ import { addDays, mondayOf } from '@/components/charts/heat-calendar/utils';
 import { monthLabel, type RainMonth } from './data/live';
 const colors = ['#dc514d', '#ef9b47', '#f1cd4d', '#8abac7', '#2676bc'];
 type CalendarMonth = Pick<RainMonth, 'id' | 'rain'> & { lower?: number; upper?: number };
-export default function RainCalendar({ months, kind = 'historical' }: { months: CalendarMonth[]; kind?: 'historical' | 'projection' }) {
+export default function RainCalendar({ months }: { months: CalendarMonth[] }) {
   if (!months.length) return <p className="empty-data">Rainfall unavailable.</p>;
   const first = new Date(`${months[0].id}-01T00:00:00Z`);
   const last = new Date(`${months.at(-1)!.id}-01T00:00:00Z`);

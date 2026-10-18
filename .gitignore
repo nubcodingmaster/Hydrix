@@ -12,3 +12,7 @@ playwright-report/
 apps/web/.cache/
 .secrets/
 apps/web/rising-guide-511814-p1-655986f692ce.json
+
+# Generated review artifacts stay local.
+output/
+apps/web/tests/screenshots/

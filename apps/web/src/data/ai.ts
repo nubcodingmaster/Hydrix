@@ -1,4 +1,5 @@
-import { buildAnalysisInput, fingerprint, isCurrentAnalysis, currentMonth, PROMPT_VERSION, groundingIssues } from '../../scripts/analysis-contract.mjs';
+import {validateSummary} from '../../scripts/gemini-summary.mjs';
+import { buildAnalysisInput, fingerprint, isCurrentAnalysis, currentMonth, PROMPT_VERSION } from '../../scripts/analysis-contract.mjs';
 import type { Snapshot } from './live';
 export type AISupport = { kind: 'water' | 'soil' | 'pest'; reason: string; farmerAction: string; governmentAction: string; evidence: string[] };
 export type AIAnalysis = { provider: 'Gemini'; model: string; generatedAt: string; inputHash: string; promptVersion: string; farmerSummary: string; governmentSummary: string; crops: {cropId:string;assessment:string}[]; support: AISupport[] };
@@ -17,7 +18,9 @@ export async function attachAnalysis(snapshot: Snapshot, raw: unknown, reference
   if (record && isCurrentAnalysis(record,await fingerprint(input),data.model!)) byPlot[plot.id] = record;
   const projection = snapshot.projections?.byPixel[plot.rainfall.at(-1)?.pixel ?? ''];
   const summary = projection && data.byPixel?.[projection.pixel];
-  if (projection && summary?.provider === 'Gemini' && summary.model === data.model && summary.promptVersion === PROMPT_VERSION && summary.inputHash === await fingerprint({promptVersion:PROMPT_VERSION,referenceMonth,rainfall:input.rainfall}) && typeof summary.summary === 'string' && summary.summary.length >= 20 && !/\d/.test(summary.summary) && !groundingIssues({farmerSummary:summary.summary}).length && Array.isArray(summary.watchMonths) && summary.watchMonths.every(id=>projection.months.some(month=>month.id===id)) && Array.isArray(summary.actions) && summary.actions.length>0 && summary.actions.every(action=>['verify_water','inspect_drainage','consult_extension'].includes(action))) projection.aiSummary = summary;
+  if (projection && summary?.provider === 'Gemini' && summary.model === data.model && summary.promptVersion === PROMPT_VERSION && summary.inputHash === await fingerprint({promptVersion:PROMPT_VERSION,referenceMonth,rainfall:input.rainfall})) {
+   try { validateSummary(summary,projection.months); projection.aiSummary=summary; } catch { /* Invalid model output is never attached to the UI. */ }
+  }
  }));
  snapshot.analysis = {model:data.model,referenceMonth,byPlot};
 }

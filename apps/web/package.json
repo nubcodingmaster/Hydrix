@@ -14,7 +14,9 @@
     "data:history": "node scripts/fetch-climate-history-noaa.mjs",
     "data:project": "node scripts/build-projections.mjs",
     "data:ai": "node scripts/generate-ai-summaries.mjs",
-    "data:earth-engine": "node scripts/sync-earth-engine.mjs"
+    "data:earth-engine": "node scripts/sync-earth-engine.mjs",
+    "data:verify": "node scripts/verify-data.mjs",
+    "data:verify:ai": "node scripts/verify-data.mjs --require-ai"
   },
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",
