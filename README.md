@@ -18,7 +18,7 @@ Tujuan proyek adalah membantu perencanaan berbasis bukti. Rekomendasi saat ini m
 | Proyeksi hujan | 12 bulan mendatang, model statistik lokal dengan evaluasi historis dan rentang ketidakpastian |
 | Konteks air | WaPOR v3: ET aktual dan ET referensi, dengan periode serta resolusi masing-masing |
 | Konteks tutupan lahan | WorldCereal 2021, klasifikasi tanaman semusim dan confidence kelas |
-| Gemini | Integrasi penjelasan tersedia; panggilan API langsung belum diuji karena API key belum dikonfigurasi |
+| Gemini | Analisis per lokasi untuk petani dan pemerintah, kandidat komoditas, usulan air/tanah/OPT, serta ringkasan musim; cakupan tercatat pada snapshot |
 | Tanah, cuaca, dan NDVI via Earth Engine | Ekstraksi langsung diuji; pH, karbon organik, tekstur, ERA5-Land, dan NDVI tersambung |
 | Kelembapan tanah | Belum terintegrasi |
 | Backend dan deployment | Belum tersedia; aplikasi membaca snapshot publik dari berkas JSON |
@@ -76,7 +76,7 @@ Sumber utama:
 
 Dari `apps/web`, jalankan `npm run data:sync` untuk seluruh urutan pembaruan. Perintah terpisah tersedia: `data:base`, `data:environment`, `data:history`, `data:project`, dan `data:ai`. Sinkronisasi memerlukan jaringan dan bergantung pada ketersediaan sumber. Detail metode ada di [README frontend](apps/web/README.md).
 
-Untuk penjelasan Gemini, salin `apps/web/.env.example` menjadi `apps/web/.env.local`, isi key dan model yang tersedia pada akun, lalu jalankan `npm run data:ai`. Jangan commit kredensial atau memakai awalan `VITE_` untuk API key. Gemini hanya menjelaskan hasil model; angka proyeksi dihitung oleh model statistik.
+Untuk penjelasan Gemini, buat `apps/web/.env.local`, isi `GEMINI_API_KEY` dan `GEMINI_MODEL` yang tersedia pada akun, lalu jalankan `npm run data:ai`. Jangan commit kredensial atau memakai awalan `VITE_` untuk API key. Gemini hanya menjelaskan hasil model; angka proyeksi dihitung oleh model statistik.
 
 ## To-do untuk partner
 
@@ -92,7 +92,7 @@ Daftar berikut merupakan usulan urutan kerja untuk melanjutkan proyek. Item yang
 ### Prioritas 2 — Backend, AI, dan pembaruan
 
 - [ ] **Sediakan backend atau job sinkronisasi.** Jalankan ekstraksi di server, simpan cache dan snapshot versi terakhir yang berhasil, serta catat waktu pembaruan dan kegagalan sumber.
-- [ ] **Uji Gemini dengan API key server.** Periksa respons nyata, biaya, kuota, dan penanganan kegagalan. Pastikan model tidak mengubah angka proyeksi atau mengarang observasi lapangan.
+- [ ] **Pantau operasional Gemini.** Periksa cakupan snapshot, penggunaan token, kuota, serta kualitas analisis setiap pembaruan data. Kredensial hanya dipakai generator lokal.
 - [ ] **Evaluasi proyeksi musiman lebih lanjut.** Bandingkan baseline pada data baru; tinjau sumber prakiraan atmosfer atau produk BMKG yang berizin. Pertahankan label ketidakpastian dan pisahkan pengamatan dari proyeksi.
 - [ ] **Susun aturan rekomendasi bersama ahli agronomi.** Setiap saran komoditas/tindakan harus memiliki alasan, bukti, dan data yang masih kurang. Uji pada beberapa lokasi sebelum dipakai untuk keputusan operasional.
 
@@ -120,4 +120,12 @@ Integrasi batch baru mencakup OpenLandMap pH, karbon organik, tekstur tanah, ERA
 
 Jalankan `npm run data:earth-engine` dari `apps/web` setelah kredensial dikonfigurasi. Snapshot publik `agronomy.json` menampilkan sumber yang belum tersambung sebagai unavailable. Tidak ada nilai tanah, cuaca, atau vegetasi buatan. Detail autentikasi, kualitas, dan keterbatasan tersedia pada README frontend.
 
-Panel pemerintah, halaman petani, sumber data, kalender, pesan gagal, dan usulan bantuan sekarang berbahasa Inggris. Nilai atribut mentah dan nama geografis tetap dipertahankan dalam ekspor. Usulan bantuan berasal dari aturan penapisan dengan sumber yang dapat diperiksa, bukan keluaran Gemini. Tidak ada diagnosis kekurangan nutrisi, identifikasi OPT, dosis pupuk, atau penetapan insektisida dari citra saja.
+Panel pemerintah, halaman petani, sumber data, kalender, pesan gagal, dan usulan bantuan sekarang berbahasa Inggris. Nilai atribut mentah dan nama geografis tetap dipertahankan dalam ekspor. Usulan bantuan pada versi ini menggunakan aturan penapisan. Integrasi Gemini terbaru dijelaskan pada bagian berikut. Tidak ada diagnosis kekurangan nutrisi, identifikasi OPT, dosis pupuk, atau penetapan insektisida dari citra saja.
+
+## Analisis Gemini langsung — 18 Oktober 2026
+
+`npm run data:ai` menghasilkan `apps/web/public/data/analysis.json` melalui Google Gemini API, memakai `GEMINI_API_KEY` dan `GEMINI_MODEL` dari `.env.local`. Kunci tidak masuk bundle browser. Input setiap lokasi mencakup atribut survei, pola dan interval hujan CHIRPS, median historis bulanan, screening deviasi eksperimental, tanah, suhu/kelembapan, NDVI, serta konteks air yang tersedia. Geometri dan titik koordinat tiap lahan tidak dikirim ke model.
+
+Gemini menyusun analisis terpisah untuk petani dan pemerintah, penilaian tiga kandidat komoditas, dan tindakan air, tanah, serta pemantauan OPT. Angka observasi dan proyeksi tetap berasal dari data/model statistik. Tanggal persiapan Planning menggunakan asumsi lead time yang dijelaskan di UI, bukan ramalan waktu serangan OPT atau penetapan penerima bantuan.
+
+Generator memproses beberapa lokasi per permintaan, menyimpan setiap batch yang lolos validasi, memberi jeda, dan mencoba ulang HTTP 429/503 secara terbatas. Menjalankan ulang melanjutkan hasil yang masih sesuai. Cache memeriksa SHA-256 input, versi prompt, model, serta bulan referensi. Browser menghitung ulang identitas input sebelum menampilkan AI; hasil yang tidak cocok dibuang. Jika AI belum tersedia, UI menyebutkan ketidaktersediaannya dan membedakan draf aturan dari analisis Gemini.

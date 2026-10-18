@@ -40,9 +40,12 @@ Heat calendar menampilkan satu bentang tahun. Warna per tanggal mengacu pada tot
 
 ## Penjelasan Gemini
 
-Salin `.env.example` menjadi `.env.local`, isi `GEMINI_API_KEY` dan model yang tersedia pada akun, lalu jalankan `npm run data:ai`. Kredensial hanya dibaca skrip lokal; jangan memakai awalan `VITE_` untuk API key. Environment saat implementasi belum memiliki key, sehingga pemanggilan Gemini langsung belum diuji dan UI tidak mengaku memiliki ringkasan Gemini.
+Buat `.env.local` berisi `GEMINI_API_KEY` dan `GEMINI_MODEL`, lalu jalankan `npm run data:ai`. API key hanya dibaca generator lokal dan tidak boleh memakai awalan `VITE_`. Model harus tersedia pada akun Google AI Studio.
 
-Gemini hanya menjelaskan hasil model yang sudah dihitung. Gemini tidak menentukan atau mengubah angka proyeksi. Respons diperiksa: bulan harus berasal dari proyeksi, tindakan harus berasal dari enum peninjauan, dan ringkasan tidak boleh menghasilkan digit atau angka baru. Tanpa key, ringkasan statistik tetap tampil tanpa teks AI palsu. Tes kontrak provider memakai respons terkontrol; bukan pengganti pengujian API langsung.
+Generator menghasilkan `public/data/analysis.json` untuk analisis petani/pemerintah, tiga kandidat komoditas, usulan air/tanah/pemantauan OPT dan ringkasan hujan per piksel. Proyeksi angka tetap dihitung model statistik. Input menyertakan periode, resolusi, cakupan, nilai yang hilang, serta keterbatasan. Identitas SHA-256 input, versi prompt, model, dan bulan referensi menentukan validitas cache. Browser memeriksa ulang input sebelum menampilkan hasil. Geometri dan titik koordinat tiap lahan tidak dikirim ke Gemini.
+
+Setiap batch disimpan secara atomik setelah validasi struktur dan pemeriksaan klaim. Klaim kesesuaian pasti, atribusi penyebab NDVI, atau aliran air/ET musiman tanpa data ditolak; model diminta mengoreksi hanya bagian bermasalah sebelum hasil diterima. `node scripts/repair-ai-analysis.mjs` juga dapat memeriksa dan mengoreksi snapshot yang sudah ada.  Keluaran yang terpotong, ID/jenis yang tidak lengkap, rujukan bukti tidak dikenal, dan digit dalam narasi ditolak. Jeda antarpermintaan serta retry terbatas menangani HTTP 429/503. Jika kuota tetap membatasi, progres terdahulu dipertahankan. Jalankan perintah yang sama untuk melanjutkan. Tidak ada model pengganti otomatis atau hasil AI buatan. Kegagalan dan cakupan parsial harus ditampilkan sebagai kondisi tersebut.
+
 
 ## Sumber dan batas pemakaian
 
@@ -88,13 +91,13 @@ The frontend rejects malformed agronomy values and snapshots from a different ba
 
 ### Support proposal limits
 
-API-only rules explain available soil and climate evidence and identify whether a support proposal can be reviewed. Soil coverage supports fertility assessment and nutrient planning proposals, not a specific fertilizer type or dose. Climate and vegetation coverage support surveillance and extension proposals, not an insecticide allocation or diagnosis. Crop profiles remain conditional; this integration does not establish full agronomic suitability. No field input form is required. Gemini summaries remain a separate optional integration and are requested in English.
+API-only rules explain available soil and climate evidence and identify whether a support proposal can be reviewed. Soil coverage supports fertility assessment and nutrient planning proposals, not a specific fertilizer type or dose. Climate and vegetation coverage support surveillance and extension proposals, not an insecticide allocation or diagnosis. Crop profiles remain conditional; this integration does not establish full agronomic suitability. No field input form is required. Validated Gemini analyses now replace proposal narratives when matching source inputs are available; English statistical/rule-based fallbacks remain explicitly identified.
 
 Live Earth Engine extraction has been tested. The first weather attempt was rejected because the source provided 692 of 720 hourly images; extraction now preserves missing timestamps and publishes temporal coverage. Unit and browser tests exercise missing data, invalid values, snapshot compatibility, localization, support panels and exports; controlled data in tests are not published as observations.
 
 ## UI review updates (16 October 2026)
 
-The planning panels omit the source/date lines below agronomy values, the methodology accordion, repeated seasonal notices, the map popover survey eyebrow, the planning slogan, calendar captions, the filter survey label, the historical Evidence column, and the regional raster footnote. Source metadata and projection parameters remain in source snapshots and exports. Support proposals are labeled Data-based guidance; Gemini remains deferred at the user's request.
+The planning panels omit the source/date lines below agronomy values, the methodology accordion, repeated seasonal notices, the map popover survey eyebrow, the planning slogan, calendar captions, the filter survey label, the historical Evidence column, and the regional raster footnote. Source metadata and projection parameters remain in source snapshots and exports. Support proposals show Gemini provenance when a validated analysis is available; redundant guidance badges remain removed.
 
 The history tab now reads all 420 observed monthly records from each CHIRPS pixel in the projection snapshot and merges the latest observed rainfall, with the latest observation taking precedence if a month occurs twice. A year selector covers 1991–2026. The absent January–August 2025 observations remain null in the selected year's calendar and table. No future projections are mixed into historical observations.
 
@@ -112,4 +115,4 @@ The board includes Urgent (actions due this or next month), Mid-term (two to thr
 - Crop protection proposes current-month surveillance preparation when weather or vegetation observations no older than 60 days are available. It does not predict a pest species, outbreak month, or insecticide requirement.
 - Nutrient support proposes a planning slot two months from the reference month when all three soil indicators at 10 cm are present. This is an explicit scheduling assumption, not a known planting date or a fertilizer prescription. Missing soil indicators yield an unscheduled Needs data proposal.
 
-The reference date uses Asia/Makassar. Missing or expired rainfall projections remain unscheduled. Source values, dates, model limits and lead-time assumptions are available through Why this proposal and the export. AI integration remains deferred as requested; the board labels results as data-based drafts. No budgets, aid recipients, or pesticide quantities are assigned.
+The reference date uses Asia/Makassar. Missing or expired rainfall projections remain unscheduled. Source values, dates, model limits and lead-time assumptions are available through Why this proposal and source snapshots. The board uses validated Gemini narratives and reports AI coverage; scheduling dates still use explicit policy lead times. No budgets, aid recipients, or pesticide quantities are assigned.

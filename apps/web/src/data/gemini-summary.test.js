@@ -15,3 +15,7 @@ test('Gemini reads model facts without mutating projection values',async()=>{
  }});
  expect(result.provider).toBe('Gemini');expect(JSON.stringify(projection)).toBe(before);
 });
+
+test('rainfall summaries cannot invent seasonal irrigation flow',()=>{
+ expect(()=>validateSummary({summary:'Seasonal flow diminishes severely in the driest quarter.',watchMonths:['2026-11'],actions:['verify_water']},months)).toThrow();
+});

@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
+import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Layers, Plus, Minus } from 'lucide-react';
 import { Button } from '@/components/motion/button';
 import type { Plot } from './data/live';
+
+// Resolve the worker as a Vite asset instead of relative to an optimized dependency.
+maplibregl.setWorkerUrl(mapWorkerUrl);
 
 export default function PilotMap({ plots, selected, onSelect, onDismiss }: { plots: Plot[]; selected: Plot | null; onSelect: (id: string) => void; onDismiss: () => void }) {
   const container = useRef<HTMLDivElement>(null);

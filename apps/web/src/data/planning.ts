@@ -1,3 +1,4 @@
+import { analysisEvidence } from './ai';
 import { cropLabel, projectionFor, type Plot, type Snapshot } from './live';
 
 export type Priority = 'urgent' | 'mid' | 'long' | 'data';
@@ -7,7 +8,7 @@ export type PlanItem = {
   id: string; plotId: string; location: string; district: string; crop: string;
   priority: Priority; kind: PlanKind; title: string; outlook: string;
   eventMonth: string | null; actionMonth: string | null; action: string;
-  evidence: PlanEvidence[]; basis: string; timingBasis: string;
+  evidence: PlanEvidence[]; basis: string; timingBasis: string; analysisProvider?: 'Gemini'; analysisModel?: string;
 };
 export const priorityLabels: Record<Priority, string> = { urgent: 'Urgent', mid: 'Mid-term', long: 'Long-term', data: 'Needs data' };
 export function planningDate(date: Date) {
@@ -83,6 +84,22 @@ export function buildPlanning(snapshot: Snapshot, referenceDate = new Date()) {
       timingBasis: 'Suggested planning slot two months from the reference month. This is a planning assumption, not a known planting date or fertilizer deadline.',
     });
   }
+  let aiLocations = 0;
+  for (const plot of snapshot.plots) {
+    const analysis = snapshot.analysis?.referenceMonth === currentMonth ? snapshot.analysis.byPlot[plot.id] : undefined;
+    if (!analysis) continue;
+    aiLocations++;
+    for (const item of items.filter(item => item.plotId === plot.id)) {
+      const advice = analysis.support.find(support => support.kind === item.kind);
+      if (!advice) continue;
+      item.outlook = advice.reason;
+      item.action = advice.governmentAction;
+      item.evidence = [...item.evidence, ...analysisEvidence(snapshot,plot,advice.evidence)];
+      item.analysisProvider = 'Gemini';
+      item.analysisModel = analysis.model;
+      item.basis = `Gemini analysis · ${analysis.model}. ${item.basis}`;
+    }
+  }
   items.sort((a,b) => (a.actionMonth ?? '9999').localeCompare(b.actionMonth ?? '9999') || a.location.localeCompare(b.location) || a.kind.localeCompare(b.kind));
-  return { asOf, provider: 'Data-based planning rules', version: 'planning-v1', farmerGroupsLinked: false, items };
+  return { asOf, aiLocations, provider: aiLocations ? 'Gemini analysis with policy scheduling' : 'Data-based planning rules', version: 'planning-v1', farmerGroupsLinked: false, items };
 }

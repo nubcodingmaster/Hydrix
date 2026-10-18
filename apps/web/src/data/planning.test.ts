@@ -4,7 +4,7 @@ import { buildPlanning, priorityFor, shiftMonth } from './planning';
 import type { Snapshot } from './live';
 
 const read = (file: string) => JSON.parse(readFileSync(new URL(`../../public/data/${file}.json`, import.meta.url), 'utf8'));
-const snapshot = { ...read('majalengka'), projections: read('projections'), agronomy: read('agronomy') } as Snapshot;
+const snapshot = { ...read('majalengka'), projections: read('projections'), agronomy: read('agronomy'), environment: read('environment') } as Snapshot;
 const date = new Date('2026-10-16T12:00:00Z');
 describe('government support planning', () => {
   it('schedules across year boundaries using action lead times, not invented severity', () => {
@@ -57,4 +57,19 @@ describe('government support planning', () => {
   it('uses the client timezone when determining the planning reference month', () => {
     expect(buildPlanning(snapshot, new Date('2026-10-31T17:00:00Z')).asOf).toBe('2026-11-01');
   });
+});
+
+it('validated Gemini advice replaces narrative without changing policy lead times or evidence', () => {
+  const data = { ...snapshot } as Snapshot;
+  const baseline = buildPlanning(data, new Date('2026-10-18T00:00:00Z'));
+  const first = data.plots[0];
+  data.analysis = {model:'gemini-test',referenceMonth:'2026-10',byPlot:{[first.id]:{provider:'Gemini',model:'gemini-test',generatedAt:'2026-10-18',inputHash:'verified',promptVersion:'test',farmerSummary:'Review with your adviser.',governmentSummary:'Coordinate field verification.',crops:[],support:['water','soil','pest'].map(kind=>({kind:kind as 'water'|'soil'|'pest',reason:'Gemini identifies missing field evidence.',farmerAction:'Review conditions with an adviser.',governmentAction:'Prepare extension-led verification support.',evidence:['survey','water']}))}}};
+  const enriched=buildPlanning(data,new Date('2026-10-18T00:00:00Z'));
+  const item=enriched.items.find(item=>item.plotId===first.id && item.kind==='water')!;
+  expect(item.action).toBe('Prepare extension-led verification support.');
+  expect(item.actionMonth).toBe(baseline.items.find(candidate=>candidate.id===item.id)?.actionMonth);
+  expect(item.analysisProvider).toBe('Gemini');
+  expect(item.evidence.some(evidence=>evidence.source===data.environment!.byPlot[first.id].cropland!.source)).toBe(true);
+  expect(item.evidence.some(evidence=>evidence.source===first.source)).toBe(true);
+  expect(enriched.items.find(item=>item.plotId!==first.id)?.analysisProvider).toBeUndefined();
 });

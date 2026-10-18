@@ -2,9 +2,11 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 const data = JSON.parse(readFileSync(new URL('../public/data/majalengka.json', import.meta.url), 'utf8'));
 
-test('government: actual survey, historical rainfall, regional export', async ({ page }) => {
+test('government: actual survey, historical rainfall and regional planning', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  const mapWorker = page.waitForResponse(response => response.url().includes('maplibre-gl-worker'));
   await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto('/');
+  expect((await mapWorker).status()).toBe(200);
   const first = data.plots[0];
   await page.getByRole('button', { name: `Select ${first.name}`, exact: true }).click();
   const popup = page.getByRole('complementary', { name: `Summary for ${first.name}` });
@@ -16,7 +18,8 @@ test('government: actual survey, historical rainfall, regional export', async ({
   await expect(popup.locator('.rain-heat-caption')).toHaveCount(0);
   await expect(popup.locator('.agronomy-grid a')).toHaveCount(0);
   await expect(popup.getByText('API observations only.', {exact:false})).toHaveCount(0);
-  await expect(popup.getByText('Data-based guidance', {exact:true})).toBeVisible();
+  await expect(popup.getByText('Data-based guidance', {exact:true})).toHaveCount(0);
+  await expect(popup.getByText('NEXT STEPS', {exact:true})).toHaveCount(0);
   await popup.getByRole('region', { name: 'Soil and crop protection' }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'tests/screenshots/english-support-map.png' });
   await expect(page.locator('[data-heat-cell]')).not.toHaveCount(0);
@@ -63,7 +66,7 @@ test('planning groups proposals by action timing, filters support and opens the 
   await expect(page.getByRole('region',{name:'Mid-term proposals',exact:true})).toBeVisible();
   await expect(page.getByRole('region',{name:'Long-term proposals',exact:true})).toBeVisible();
   await expect(page.getByRole('region',{name:'Needs data proposals',exact:true})).toBeVisible();
-  await expect(page.getByText('Data-based drafts · Farmer groups not linked',{exact:true})).toBeVisible();
+  await expect(page.locator('.planning-basis')).toContainText('Farmer groups not linked');
   await page.screenshot({path:'tests/screenshots/government-planning.png'});
   await page.getByRole('button',{name:'Support category',exact:true}).click();
   await page.getByRole('option',{name:'Water support',exact:true}).click();
@@ -95,7 +98,7 @@ test('mobile farmer: GPS failure, real location selector, readable page', async 
   await page.screenshot({ path: 'tests/screenshots/english-farmer.png', fullPage: true });
 });
 
-test('API observations populate the English agronomy panel and location export', async ({ page }) => {
+test('API observations populate the unified agronomy card', async ({ page }) => {
   const meta = { dataset: 'test', source: 'https://developers.google.com/earth-engine/datasets/catalog/test', resolutionMeters: 250, kind: 'modeled-soil', period: { start: '1950-01-01', end: '2018-01-01' } };
   const soil = (value: number, label?: string) => ({...meta, unit: 'test', depths: [{depthCm:10,value,label}]});
   const agronomy = { ph:soil(5.5), carbon:soil(20), texture:soil(7,'Loam'), weather:{...meta,temperatureC:26,relativeHumidityPct:80,hours:720,expectedHours:720,hourlyCoverage:1,missingHours:[],forecast:false}, vegetation:{...meta,ndvi:.4,previousNdvi:.6,validCoverage:.8,previousValidCoverage:.8,meanObservations:4,minimumObservations:3,previousPeriod:meta.period} };
@@ -110,14 +113,16 @@ test('API observations populate the English agronomy panel and location export',
   await expect(panel.getByText('0.4', {exact:true})).toBeVisible();
   await page.getByRole('button', {name:'Regional map',exact:true}).click();
   await page.getByRole('button', {name:'Rain calendar',exact:true}).click();
-  const downloadEvent = page.waitForEvent('download');
-  await page.getByRole('button', {name:'Export location data'}).click();
-  const download = await downloadEvent;
-  const path = await download.path();
-  const exported = JSON.parse(readFileSync(path!, 'utf8'));
-  expect(exported.agronomy.ph.depths[0].value).toBe(5.5);
-  expect(exported.ndvi).toBe(.4);
-  expect(exported.support_proposals[1].action).toContain('does not identify a pest');
+  await expect(page.getByRole('button', {name:'Export location data'})).toHaveCount(0);
+  await page.getByRole('button', {name:'Crop candidates',exact:true}).click();
+  await expect(page.locator('.crop-illustration')).toHaveCount(3);
+  for (const image of await page.locator('.crop-illustration').all()) {
+    await expect(image).toBeVisible();
+    expect(await image.evaluate((element: HTMLImageElement) => element.complete && element.naturalWidth > 0)).toBe(true);
+  }
+  await expect(page.locator('.candidates-section > .rotation-note')).toHaveCount(0);
+  await expect(page.locator('.page-footer')).toHaveCount(0);
+  await page.screenshot({path:'tests/screenshots/refined-crop-candidates.png',fullPage:true});
 });
 
 test('missing snapshot shows a retry state instead of synthetic data', async ({ page }) => {
@@ -126,4 +131,38 @@ test('missing snapshot shows a retry state instead of synthetic data', async ({ 
   await expect(page.getByText('Source data could not be loaded. Please retry.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
   await expect(page.locator('.map-canvas')).toHaveCount(0);
+});
+
+test('verified Gemini analysis reaches government, farmer, crop and planning views; failures remain explicit', async ({page}) => {
+  const {buildAnalysisInput,fingerprint,PROMPT_VERSION,currentMonth}=await import('../scripts/analysis-contract.mjs');
+  const read=(name:string)=>JSON.parse(readFileSync(new URL(`../public/data/${name}.json`,import.meta.url),'utf8'));
+  const snapshot={...data,projections:read('projections'),environment:read('environment'),agronomy:read('agronomy')};
+  const plot=data.plots[0],referenceMonth=currentMonth();
+  const input=buildAnalysisInput(snapshot,plot,referenceMonth);
+  const report={provider:'Gemini',model:'gemini-ui-fixture',generatedAt:new Date().toISOString(),promptVersion:PROMPT_VERSION,inputHash:await fingerprint(input),farmerSummary:'Review water availability with your extension adviser before the drier window.',governmentSummary:'Coordinate irrigation verification before the seasonal water planning window.',crops:['0','1','2'].map(cropId=>({cropId,assessment:'Gemini crop assessment requires verification of soil, water and local variety.'})),support:['water','soil','pest'].map(kind=>({kind,reason:'Gemini considers regional observations with uncertainty and missing field evidence.',farmerAction:`Discuss ${kind} evidence with your extension adviser before acting.`,governmentAction:`Arrange ${kind} verification and extension assistance before allocating support.`,evidence:['survey','rainfall']}))};
+  const pixel=plot.rainfall.at(-1).pixel;
+  const summary={provider:'Gemini',model:report.model,promptVersion:PROMPT_VERSION,inputHash:await fingerprint({promptVersion:PROMPT_VERSION,referenceMonth,rainfall:input.rainfall}),generatedAt:report.generatedAt,summary:'Seasonal rainfall estimates remain uncertain and require local water verification.',watchMonths:[],actions:['verify_water']};
+  let unavailable=false;
+  await page.route('**/data/analysis.json',route=>unavailable?route.fulfill({status:503}):route.fulfill({json:{schemaVersion:1,baseFetchedAt:data.fetchedAt,referenceMonth,model:report.model,byPlot:{[plot.id]:report},byPixel:{[pixel]:summary}}}));
+  await page.goto('/');
+  await page.getByRole('button',{name:`Select ${plot.name}`,exact:true}).click();
+  const popup=page.getByRole('complementary',{name:`Summary for ${plot.name}`});
+  await expect(popup.getByText(report.governmentSummary,{exact:true})).toBeVisible();
+  await expect(popup.getByText(summary.summary,{exact:false})).toBeVisible();
+  await expect(popup.locator('.ai-attribution')).toContainText('gemini-ui-fixture');
+  await expect(popup.getByText(report.support[0].governmentAction,{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Planning',exact:true}).click();
+  await page.getByRole('button',{name:'Planning district',exact:true}).click();
+  await page.getByRole('option',{name:plot.district,exact:true}).click();
+  await expect(page.getByText(report.support[2].governmentAction,{exact:true})).toBeVisible();
+  await expect(page.locator('.planning-basis')).toContainText('1/106');
+  await page.getByRole('button',{name:'Crop candidates',exact:true}).click();
+  await expect(page.locator('.crop-note').first()).toHaveText(report.crops[0].assessment);
+  await page.getByRole('button',{name:'Farmer page',exact:true}).click();
+  await expect(page.locator('.farmer-summary-text')).toContainText(report.farmerSummary);
+  await expect(page.getByText(report.support[0].farmerAction,{exact:true})).toBeVisible();
+  await page.screenshot({path:'tests/screenshots/gemini-farmer.png',fullPage:true});
+  unavailable=true;await page.reload();
+  await expect(page.locator('.ai-attribution')).toContainText('Gemini analysis unavailable');
+  await expect(page.getByText(report.farmerSummary,{exact:false})).toHaveCount(0);
 });

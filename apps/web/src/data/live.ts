@@ -1,3 +1,4 @@
+import { attachAnalysis, type AnalysisSnapshot } from './ai';
 import type { MultiPolygon, Polygon } from 'geojson';
 import { isAgronomy, supportRecommendations, type Agronomy } from './agronomy';
 
@@ -21,6 +22,7 @@ export type Plot = {
   source: string; rainfall: RainMonth[];
 };
 export type Snapshot = {
+  analysis?: AnalysisSnapshot;
   schemaVersion: 1; fetchedAt: string; period: { start: string; end: string; kind: 'historical' };
   plots: Plot[];
   sources: { name: string; url: string; status: 'connected' | 'unavailable' | 'cached'; purpose: string }[];
@@ -115,9 +117,10 @@ export async function loadSnapshot(signal?: AbortSignal): Promise<Snapshot> {
   const optional = async (path: string) => {
     try { const response = await fetch(path,{signal,cache:'no-cache'}); if(!response.ok) return undefined; const value=await response.json(); return value.schemaVersion===1?value:undefined; } catch { return undefined; }
   };
-  const [environment,projections,agronomy] = await Promise.all([optional('/data/environment.json'),optional('/data/projections.json'),optional('/data/agronomy.json')]);
+  const [environment,projections,agronomy,analysis] = await Promise.all([optional('/data/environment.json'),optional('/data/projections.json'),optional('/data/agronomy.json'),optional('/data/analysis.json')]);
   data.environment=environment?.baseFetchedAt===data.fetchedAt?environment:undefined; data.projections=projections?.baseFetchedAt===data.fetchedAt?projections:undefined;
   data.agronomy=isAgronomy(agronomy) && agronomy.baseFetchedAt===data.fetchedAt ? agronomy : undefined;
+  await attachAnalysis(data,analysis);
   // Localize presentation without changing original source attributes or IDs.
   const sourceLabels: Record<string, [string,string]> = {
     'Kementan · Bawang Merah': ['Kementan · Shallot', 'Historical survey geometry and attributes'],
@@ -135,5 +138,7 @@ export async function loadSnapshot(signal?: AbortSignal): Promise<Snapshot> {
   if(data.agronomy) data.sources.push(...data.agronomy.sources);
   else data.sources.push({name:'Google Earth Engine soil and crop context',url:'https://developers.google.com/earth-engine',status:'unavailable',purpose:'No valid matching Earth Engine snapshot is available. Soil, weather and vegetation observations have not been substituted.'});
   if(data.projections) data.sources.push({name:'Seasonal rainfall model',url:'https://coastwatch.pfeg.noaa.gov/erddap/info/chirps20GlobalMonthlyP05/index.html',status:'connected',purpose:'Local model trained on historical CHIRPS; evaluation and uncertainty included. Not an atmospheric weather forecast.'});
+  const aiCount=Object.keys(data.analysis?.byPlot ?? {}).length;
+  data.sources.push({name:'Google Gemini analysis',url:'https://ai.google.dev/',status:aiCount?'connected':'unavailable',purpose:`Validated Gemini analysis for ${aiCount}/${data.plots.length} locations. Statistical projections and measured observations remain separate from AI interpretation.`});
   return data;
 }
