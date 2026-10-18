@@ -57,30 +57,45 @@ test('government: actual survey, historical rainfall and regional planning', asy
   expect(errors).toEqual([]);
 });
 
-test('planning groups proposals by action timing, filters support and opens the selected location', async ({page}) => {
-  await page.setViewportSize({width:1440,height:1000});
-  await page.goto('/');
+test('planning screens signals, groups twelve months and filters month and year without claiming confirmed assistance', async ({page}) => {
+  await page.clock.install({time:new Date('2026-10-18T00:00:00Z')});
+  await page.setViewportSize({width:1440,height:1000});await page.goto('/');
   await page.getByRole('button',{name:'Planning',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Planning',exact:true})).toBeVisible();
-  await expect(page.getByRole('region',{name:'Urgent proposals',exact:true})).toBeVisible();
-  await expect(page.getByRole('region',{name:'Mid-term proposals',exact:true})).toBeVisible();
-  await expect(page.getByRole('region',{name:'Long-term proposals',exact:true})).toBeVisible();
-  await expect(page.getByRole('region',{name:'Needs data proposals',exact:true})).toBeVisible();
-  await expect(page.locator('.planning-basis')).toContainText('Farmer groups not linked');
-  await page.screenshot({path:'tests/screenshots/government-planning.png'});
-  await page.getByRole('button',{name:'Support category',exact:true}).click();
-  await page.getByRole('option',{name:'Water support',exact:true}).click();
+  await expect(page.locator('.planning-month')).toHaveCount(12);
+  await expect(page.locator('.planning-stat').first()).toContainText('Confirmed assistance');
+  await expect(page.locator('.planning-stat').first().locator('strong')).toHaveText('0');
   await expect(page.locator('.planning-card')).not.toHaveCount(0);
-  await expect(page.locator('.kind-pest')).toHaveCount(0);
-  await page.setViewportSize({width:390,height:844});
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await expect(page.getByRole('button',{name:'Crop candidates',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Sources & data quality',exact:true})).toHaveCount(0);
+  await expect(page.locator('.planning-action').first().locator('span')).toHaveText('Suggested support');
+  expect(await page.locator('.planning-card').first().evaluate(element=>getComputedStyle(element).borderTopWidth)).toBe('1px');
+  await page.getByRole('button',{name:'Planning year',exact:true}).click();await page.getByRole('option',{name:'2027',exact:true}).click();
+  await page.getByRole('button',{name:'Planning month',exact:true}).click();await page.getByRole('option',{name:'March',exact:true}).click();
+  await expect(page.locator('.planning-month')).toHaveCount(1);
+  await expect(page.getByRole('region',{name:'Planning for March 2027',exact:true})).toBeVisible();
+  await expect(page.locator('.planning-card')).toHaveCount(0);
+  await page.getByRole('button',{name:'Planning year',exact:true}).click();await page.getByRole('option',{name:'2026',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Planning month',exact:true})).toHaveText('All months');
+  await page.getByRole('button',{name:'Planning month',exact:true}).click();await page.getByRole('option',{name:'October',exact:true}).click();
+  await expect(page.getByRole('region',{name:'Planning for October 2026',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Support category',exact:true}).click();await page.getByRole('option',{name:'Water readiness',exact:true}).click();
+  await expect(page.locator('.planning-card')).toHaveCount(0);
+  await page.getByRole('button',{name:'Support category',exact:true}).click();await page.getByRole('option',{name:'All support types',exact:true}).click();
+  await page.getByRole('button',{name:'Confirmed assistance (0)',exact:true}).click();await expect(page.locator('.planning-card')).toHaveCount(0);
+  await page.getByRole('button',{name:/^Field checks \(/}).click();
+  await expect(page.locator('.planning-card')).not.toHaveCount(0);
+  const first=page.locator('.planning-card').first(),locationText=await first.locator('.planning-location').innerText();
+  const plot=data.plots.find((plot:{name:string;district:string})=>locationText===`${plot.name} · ${plot.district}`);
+  await page.getByRole('button',{name:'Planning district',exact:true}).click();await page.getByRole('option',{name:plot.district,exact:true}).click();
+  await expect(page.locator('.planning-basis')).toContainText('Farmer groups not linked');
+  await expect(page.getByRole('listbox')).toHaveCount(0);
+  await page.getByRole('heading',{name:'Planning',exact:true}).scrollIntoViewIfNeeded();
+  await page.screenshot({path:'tests/screenshots/government-planning.png'});
+  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.screenshot({path:'tests/screenshots/government-planning-mobile.png'});
-  await page.setViewportSize({width:1440,height:1000});
-  const first=page.locator('.planning-card').first();
-  const locationText=await first.locator('.planning-location').innerText();
-  const location=data.plots.find((plot:{name:string;district:string})=>locationText===`${plot.name} · ${plot.district}`).name;
-  await first.getByRole('button',{name:'View on map',exact:true}).click();
-  await expect(page.getByRole('complementary',{name:`Summary for ${location}`,exact:true})).toBeVisible();
+  await page.setViewportSize({width:1440,height:1000});await page.locator('.planning-card').first().getByRole('button',{name:'View on map',exact:true}).click();
+  await expect(page.getByRole('complementary',{name:`Summary for ${plot.name}`,exact:true})).toBeVisible();
 });
 
 test('mobile farmer: GPS failure, real location selector, readable page', async ({ page }) => {
@@ -114,7 +129,8 @@ test('API observations populate the unified agronomy card', async ({ page }) => 
   await page.getByRole('button', {name:'Regional map',exact:true}).click();
   await page.getByRole('button', {name:'Rain calendar',exact:true}).click();
   await expect(page.getByRole('button', {name:'Export location data'})).toHaveCount(0);
-  await page.getByRole('button', {name:'Crop candidates',exact:true}).click();
+  await page.getByRole('button', {name:'Farmer page',exact:true}).click();
+  await expect(page.locator('.crop-unknown')).toHaveCount(0);
   await expect(page.locator('.crop-illustration')).toHaveCount(3);
   for (const image of await page.locator('.crop-illustration').all()) {
     await expect(image).toBeVisible();
@@ -134,12 +150,15 @@ test('missing snapshot shows a retry state instead of synthetic data', async ({ 
 });
 
 test('verified Gemini analysis reaches government, farmer, crop and planning views; failures remain explicit', async ({page}) => {
-  const {buildAnalysisInput,fingerprint,PROMPT_VERSION,currentMonth}=await import('../scripts/analysis-contract.mjs');
+  await page.clock.install({time:new Date('2026-10-18T00:00:00Z')});
+  const {buildAnalysisInput,fingerprint,PROMPT_VERSION}=await import('../scripts/analysis-contract.mjs');
   const read=(name:string)=>JSON.parse(readFileSync(new URL(`../public/data/${name}.json`,import.meta.url),'utf8'));
   const snapshot={...data,projections:read('projections'),environment:read('environment'),agronomy:read('agronomy')};
-  const plot=data.plots[0],referenceMonth=currentMonth();
+  const plot=data.plots[0],referenceMonth='2026-10';
+  Object.assign(snapshot.agronomy.byPlot[plot.id].vegetation,{ndvi:.3,previousNdvi:.7,validCoverage:1,previousValidCoverage:1,meanObservations:5});
+  await page.route('**/data/agronomy.json',route=>route.fulfill({json:snapshot.agronomy}));
   const input=buildAnalysisInput(snapshot,plot,referenceMonth);
-  const report={provider:'Gemini',model:'gemini-ui-fixture',generatedAt:new Date().toISOString(),promptVersion:PROMPT_VERSION,inputHash:await fingerprint(input),farmerSummary:'Review water availability with your extension adviser before the drier window.',governmentSummary:'Coordinate irrigation verification before the seasonal water planning window.',crops:['0','1','2'].map(cropId=>({cropId,assessment:'Gemini crop assessment requires verification of soil, water and local variety.'})),support:['water','soil','pest'].map(kind=>({kind,reason:'Gemini considers regional observations with uncertainty and missing field evidence.',farmerAction:`Discuss ${kind} evidence with your extension adviser before acting.`,governmentAction:`Arrange ${kind} verification and extension assistance before allocating support.`,evidence:['survey','rainfall']}))};
+  const report={provider:'Gemini',model:'gemini-ui-fixture',generatedAt:new Date().toISOString(),promptVersion:PROMPT_VERSION,inputHash:await fingerprint(input),farmerSummary:'Review water availability with your extension adviser before the drier window.',governmentSummary:'Coordinate irrigation verification before the seasonal water planning window.',crops:['0','1','2'].map(cropId=>({cropId,assessment:'Gemini crop assessment requires verification of soil, water and local variety.'})),support:['water','soil','pest'].map(kind=>({kind,reason:'Gemini considers regional observations with uncertainty and missing field evidence.',farmerAction:`Discuss ${kind} evidence with your extension adviser before acting.`,governmentAction:`Arrange ${kind} verification and extension assistance before allocating support.`,evidence:['survey','rainfall','vegetation']}))};
   const pixel=plot.rainfall.at(-1).pixel;
   const summary={provider:'Gemini',model:report.model,promptVersion:PROMPT_VERSION,inputHash:await fingerprint({promptVersion:PROMPT_VERSION,referenceMonth,rainfall:input.rainfall}),generatedAt:report.generatedAt,summary:'Seasonal rainfall estimates remain uncertain and require local water verification.',watchMonths:[],actions:['verify_water']};
   let unavailable=false;
@@ -154,11 +173,11 @@ test('verified Gemini analysis reaches government, farmer, crop and planning vie
   await page.getByRole('button',{name:'Planning',exact:true}).click();
   await page.getByRole('button',{name:'Planning district',exact:true}).click();
   await page.getByRole('option',{name:plot.district,exact:true}).click();
-  await expect(page.getByText(report.support[2].governmentAction,{exact:true})).toBeVisible();
+  await expect(page.locator('.planning-action').first()).toContainText(report.support[2].governmentAction);
+  await expect(page.locator('.planning-action').first().getByLabel('AI-assisted')).toBeVisible();
   await expect(page.locator('.planning-basis')).toContainText('1/106');
-  await page.getByRole('button',{name:'Crop candidates',exact:true}).click();
-  await expect(page.locator('.crop-note').first()).toHaveText(report.crops[0].assessment);
   await page.getByRole('button',{name:'Farmer page',exact:true}).click();
+  await expect(page.locator('.crop-note').first()).toHaveText(report.crops[0].assessment);
   await expect(page.locator('.farmer-summary-text')).toContainText(report.farmerSummary);
   await expect(page.getByText(report.support[0].farmerAction,{exact:true})).toBeVisible();
   await page.screenshot({path:'tests/screenshots/gemini-farmer.png',fullPage:true});

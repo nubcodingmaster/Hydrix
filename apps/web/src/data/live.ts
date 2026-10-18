@@ -10,7 +10,7 @@ export type Projection = {
   validation: { selectionYears: string; calibrationYears: string; evaluationYears: string; maeMm: number; baselineMaeMm: number; intervalCoverage: number; evaluatedMonths: number };
   interval: { nominalCoverage: number; radiusMm: number; method: string };
   history?: { id: string; rain: number | null }[];
-  confidence: 'low'; months: ProjectionMonth[]; limitations: string[];
+  confidence: 'low' | 'medium' | 'high'; months: ProjectionMonth[]; limitations: string[];
   aiSummary?: { provider: string; model: string; generatedAt: string; summary: string; watchMonths: string[]; actions: string[] };
 };
 export type WaterSample = { value: number | null; unit: string; period: { start: string; end: string }; pixel: string; resolutionDegrees: number[]; scale: number; source: string };
